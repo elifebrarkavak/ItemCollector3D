@@ -140,3 +140,20 @@ the reveal - so a quick double tap on DIG could trigger COLLECT unintentionally.
 CollectButton click; it must be evaluated on a real Android device. Possible mitigations if it turns out to be a problem: a short input
 lockout on COLLECT after the reveal, or separate button positions. Neither is implemented.)
 
+## Progression & save system (stage 6, branch `ebrar`): open points
+
+- **Manual Play persists to a real file.** `GameplayTest` saves to `<persistentDataPath>/item_collector_progress.json` (on this Mac
+  `~/Library/Application Support/DefaultCompany/ItemCollector3DStaging/`). A coin collected in one Play stays collected (gold 10) in the next Play.
+  Delete the file or use the `ProgressManager` context menu "Reset Saved Progress" to start fresh. Automated tests use an in-memory store.
+- **No notification UI yet:** AREA COMPLETE / NEW AREA UNLOCKED are events only; nothing is shown to the player. Rocky Canyon / Ancient Mine
+  scenes do not exist (locks were tested with `SetAreaId`).
+- **Not tested on a real Android device:** `persistentDataPath`, saving on app pause/kill and reloading. The save is plain JSON (not tamper-proof) and local only.
+- **Treasure ids:** `TreasureDefinition.Id` is the TYPE id; each placed treasure needs its own unique `TreasureSpot.spotId`. Spots without one use a
+  position-based fallback that changes if the spot is moved. Duplicate ids make treasures share one collected flag (second pays nothing); the controller
+  logs a warning and `TreasureIdValidator` reports them.
+- **Bug found and fixed in this stage (kept for the record):** the static `TreasureSpot.AlreadyCollectedProvider` was only cleared if the
+  `ProgressManager` was still alive when the controller was destroyed; with an unlucky destroy order a stale provider could mark the next scene's
+  coin as collected (one existing dig test failed once in the full suite). Fixed by caching the connected service; regression test added. A static
+  provider remains a global hook - keep it in mind when adding scenes.
+- **Catalog edits after players saved:** unlock/complete flags are recomputed from the saved gold on load (repair warning, notifications not replayed).
+

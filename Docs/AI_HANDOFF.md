@@ -9,13 +9,82 @@ Rules for whichever agent picks this up:
 5. No new packages without asking. Update this file when you finish or stop (even if the task is half done).
 
 ## Current state (2026-11-16)
-- Branch: `feature/dig-feedback` (from `origin/main` @ `25df926`). Stage 5 (dig animation & feedback with range cancellation) is COMMITTED and
-  PUSHED to `origin/feature/dig-feedback` (message `feat: add dig animation and feedback with range cancellation`; hash: see `git log`).
-  A Pull Request into `main` is OPEN (not merged). `main` contains stages 1-4 incl. rarity reward feedback, the gold progress bar fix and
-  the SafeAreaFitter guard (PR #4 merged).
+- Branch: `ebrar` (started at `main` @ `86a5e20`). Stage 6 (game progression & save system) is COMMITTED and PUSHED to `origin/ebrar`
+  (message `feat: add persistent progression and save system`; hash: see `git log`). A Pull Request `ebrar` -> `main` is OPEN (not merged).
+  `main` contains stages 1-5 (everything up to dig animation & feedback).
 - Last agent: Claude Code. Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
+- **Manual-testing note:** `GameplayTest` now has a `ProgressManager` that saves to a REAL file
+  (`<Application.persistentDataPath>/item_collector_progress.json`; on this Mac
+  `~/Library/Application Support/DefaultCompany/ItemCollector3DStaging/`). After you collect the coin in Play Mode it stays collected and the
+  gold stays 10 in the next Play. To start fresh: delete that file, or right-click the `ProgressManager` component > "Reset Saved Progress".
+  Automated tests never touch the file (in-memory store).
 
-## Stage 5 (this branch, uncommitted): Dig animation & feedback
+## Stage 6 (branch `ebrar`, PR open): Game progression & save system
+Goal: persistent, cumulative progress without a second gold system. The existing `TreasureHuntController.TotalGold` / HUD now read from a
+`ProgressService`; DIG -> COLLECT -> Gold Reward and the HUD are unchanged for the player.
+
+Code - NEW `Assets/Scripts/Progress/` (namespace `ItemCollector3D.Progress`):
+- `GameProgressData` - saved state (JsonUtility): `version` (1), `totalGold` (cumulative), `collectedTreasureIds`, `unlockedAreaIds`, `completedAreaIds`.
+- `AreaCatalog` (ScriptableObject) + `AreaEntry` - ordered areas with unlock / goal TOTAL gold (Concept Document 2.7): Green Mine open at start,
+  goal 500; Rocky Canyon unlocks at 500, goal 1200; Ancient Mine unlocks at 1200, goal 2500. `Validate()` (unique ids, first area open, increasing
+  thresholds). `CreateDefault()` is the built-in fallback if the asset is missing/invalid.
+- `IProgressStore` + `FileProgressStore` (atomic write via temp file + replace, `.corrupt` backup, never throws) + `MemoryProgressStore` (tests).
+- `ProgressService` (plain C#): `RegisterCollected(treasureId, gold)` -> `Accepted` / `AlreadyCollected` / `InvalidId` / `InvalidGold`; gold is added once
+  per treasure id; thresholds are evaluated and `AreaCompleted(areaId)` ("AREA COMPLETE") / `AreaUnlocked(areaId)` ("NEW AREA UNLOCKED") fire ONCE per
+  area (several can fire for one big collection, in order: unlock, complete); saved after every change; `Load()` never throws: missing file = NewGame;
+  empty / unparsable / unsupported-version data = Recovered (bad text backed up, clean data written); readable but inconsistent data (negative or absurd
+  gold, empty/duplicate ids, unknown areas, area flags that disagree with the gold) is repaired and reported. Loading never replays notifications.
+- `ProgressManager` (MonoBehaviour): creates the service (file store, or `ProgressManager.StoreFactoryOverride` for tests), relays the two area events,
+  saves on `OnApplicationPause`, context menu "Reset Saved Progress".
+- `ProgressLog` - all progress diagnostics (recovered save, duplicate id, I/O) go through `ProgressLog.Warning`; tests capture them via `WarningSink`.
+Code - CHANGED:
+- `TreasureSpot` - new serialized `spotId` (unique id of THIS placed treasure; `TreasureDefinition.Id` is only the TYPE id), `SpotId` (explicit, or a
+  deterministic fallback `scene/type@x,y,z`), `HasExplicitId`, `SetSpotId`, `RestoreCollected()` (silent: no event, no gold), static
+  `AlreadyCollectedProvider` consulted in `OnEnable` so a reloaded scene or a late-spawned spot starts Collected.
+- NEW `TreasureIdValidator` / `TreasureIdReport` - reports duplicate ids and how many spots use a fallback id.
+- `TreasureHuntController` - optional `progress` (ProgressManager) and `areaId`; `TotalGold` reads the persistent total (scene-local counter only when no
+  ProgressManager is assigned, exactly as before); collect goes through `RegisterCollected` (a duplicate id pays nothing and raises no reward event);
+  HUD maximum = the area's goal, title = the area's display name (`GREEN MINE`); restores collected spots on start; a LOCKED area offers no DIG/COLLECT
+  (`IsAreaAccessible`, `SetAreaId`); logs duplicate treasure ids.
+Assets / scene:
+- NEW `Assets/Data/Areas/AreaCatalog.asset` (the three areas above).
+- CHANGED `GameplayTest.unity` (additions): `ProgressManager` object (catalog assigned), controller `progress` + `areaId = green_mine`, coin
+  `spotId = green_mine.gold_coin_01`.
+Tests (all PlayMode):
+- NEW `ProgressTestIsolation` ([SetUpFixture] for the whole `ItemCollector3D.Tests.PlayMode` namespace): forces a fresh in-memory store for every
+  ProgressManager and captures progress warnings, so tests never read/write the real save and the Console stays clean.
+- NEW `ProgressServiceTests` (23): catalog values/validation/fallback; new game; thresholds + once-only events + cumulative gold; one collection
+  crossing several thresholds; same id pays once; invalid registrations; save/load round trip (events not replayed); reset; corrupt data
+  (7 bad inputs: recovered, backed up, replaced); missing fields; inconsistent data repaired; gold above threshold repaired silently; absurd gold
+  clamped; null store; real `FileProgressStore` round trip incl. corrupt file. Each test declares the warning it expects; any other warning fails it.
+- NEW `ProgressSceneTests` (8, real GameplayTest + controller + HUD): collecting saves gold + id and the HUD shows `0 / 500` -> `10 / 500` with title
+  `GREEN MINE`; scene reload does not pay the collected coin again and gold keeps accumulating (`35 / 500`); area events fire once per threshold;
+  a locked area (`rocky_canyon`, HUD `0 / 1200`) offers no DIG until 500 total gold, then gold carries over (`510 / 1200`); treasure ids are unique
+  (and duplicates are detected); two spots with the same id pay once; destroy-order regression (below); fresh save starts clean.
+
+### Bug found and fixed during stage 6 (honest record)
+The first full-suite run was 78/79: an existing dig test failed (IsDigging false after DIG). Not flaky - a real defect in my new code. Unity destroys
+scene objects in no fixed order; `DisconnectProgress` only cleared the static `TreasureSpot.AlreadyCollectedProvider` while `progress` was still
+alive, so a stale provider could survive into the next scene load and silently mark the coin Collected. Reproduced deterministically
+(`Scene_DestroyOrder_NeverLeavesAStaleCollectedProvider_ForTheNextScene` failed before the fix), fixed by caching the connected service in the
+controller. The dig class alone had passed (lucky destroy order).
+
+### Test results (real, stage 6)
+- Compile: 0 errors. `ProgressServiceTests` 23/23, `ProgressSceneTests` 8/8 (targeted).
+- Full PlayMode suite, ONE run after all fixes: **81/81 PASSED**. Console: 0 errors, 0 progress warnings (1 unrelated Unity "Account API" warning).
+- Real-file check in the Editor (two Play sessions): session 1 collected the coin and wrote
+  `{"version":1,"totalGold":10,"collectedTreasureIds":["green_mine.gold_coin_01"],"unlockedAreaIds":["green_mine"],"completedAreaIds":[]}`;
+  session 2 reported `Loaded`, total 10, coin already Collected, HUD `10 / 500 GOLD`, no DIG at the coin. The test save was deleted afterwards.
+- The older intermittent Player tests passed again; their cause is still NOT proven (see Known Issues).
+
+### Stage 6 limitations (not verified / open)
+- AREA COMPLETE / NEW AREA UNLOCKED exist as EVENTS (+ message constants) only: no banner/screen yet (Area Selection etc. are later stages).
+- Only `GameplayTest` (green_mine) exists; Rocky Canyon / Ancient Mine scenes do not, so locks are tested with `SetAreaId` on the same scene.
+- Persistence not verified on a real Android device (`persistentDataPath`, app pause/kill); no cloud save; the file is plain JSON (not tamper-proof).
+- Fallback treasure ids are position based and change if a spot is moved: give every placed treasure an explicit unique `spotId`.
+- If the catalog thresholds are edited after players saved, area flags are recomputed from the saved gold on load (repair warning, no notifications).
+
+## Stage 5 (merged to `main`, PR #5): Dig animation & feedback
 Goal: DIG becomes a short dig experience (Detect -> DIG -> [dig 0.45 s: motion + dirt + sound] -> Reveal -> Collect -> Gold reward) with
 no new treasure system; `TreasureSpot` (Hidden -> Revealed -> Collected), HUD, rarity reward feedback and SafeAreaFitter are unchanged.
 
@@ -206,10 +275,16 @@ Tests:
 - 2.8: lightweight audio/particle feedback for mobile, single-player Android, third-person; no combat/enemies/online/economy added.
 - Not in this stage by decision: Green Mine map, Main Menu, Area Selection, other areas, final miner model/Animator, persistent treasury.
 
+## Concept Document v1.0 check for stage 6 (2.7 Game Play, 2.8 Key Features)
+- 2.7: gold accumulates and is visible as progress ("320/500 GOLD"-style HUD, now `total / current area goal`); "Reaching an area's target displays
+  Area Complete and New Area Unlocked" - the EVENTS exist (UI/Area Selection later); targets 500 / 1200 total / 2500 total and unlock thresholds
+  implemented as data; "leaving an area does not erase the treasury progress" - gold is persistent and cumulative.
+- 2.8: "Gold treasury, ..., Area Complete feedback, and area unlocking" - treasury + unlocking done at data/logic level; offline, single player.
+- Not in this stage by decision: Main Menu, Settings, Character Selection, new maps / Area Selection, notification UI.
+
 ## Next steps (suggested, in order)
-1. Review stage 5; commit only when the user allows it (suggested: `feat: add dig animation, dirt particles and dig sound`).
-2. Optional polish: HUD counter animation, animated progress fill, haptics, final miner model + Animator (assign to `PlayerDigAnimator`).
-3. Human check of dig/collect/detector sounds and of the effects on a real phone (see Known Issues).
-4. Area Complete / New Area Unlocked + persistent treasury; Main Menu and Area Selection.
-5. Green Mine scene (Beyza) and other areas; final models/particles/audio (Sibel) via profile overrides.
-6. Android build, add real scenes to Build Settings, device test (touch, audio, performance).
+1. Review stage 6; commit only when the user allows it (suggested: `feat: add persistent progress, area unlocks and save system`).
+2. Notification UI for AREA COMPLETE / NEW AREA UNLOCKED, then Area Selection and Main Menu (read `ProgressService` / `ProgressManager`).
+3. Green Mine scene (Beyza) and other areas: add a `ProgressManager` + `TreasureHuntController` (`areaId`) per area and give every treasure an explicit `spotId`.
+4. Optional polish: HUD counter animation, animated progress fill, haptics, final miner model + Animator, final audio/particles (Sibel).
+5. Android build, add real scenes to Build Settings, device test (touch, audio, save/load, performance).

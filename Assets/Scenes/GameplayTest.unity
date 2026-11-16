@@ -342,6 +342,52 @@ MonoBehaviour:
   collisionRadius: 0.2
   collisionPadding: 0.1
   minimumDistance: 0.5
+--- !u!1 &368708509
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 368708511}
+  - component: {fileID: 368708510}
+  m_Layer: 0
+  m_Name: ProgressManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &368708510
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 368708509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98a5e28d49c2e4fb98f4e53f11cbff52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Progress.ProgressManager
+  catalog: {fileID: 11400000, guid: c945002ddccfc4cff8f31e5c841aee0e, type: 2}
+  fileName: item_collector_progress.json
+--- !u!4 &368708511
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 368708509}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &505378730 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4503983501530559921, guid: cb51cd5c83b1c4e348c5fb334089e938, type: 3}
@@ -1415,6 +1461,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 5033465701637116582, guid: 0f0d2ba66672f4f35936ac87efc5b77c, type: 3}
+      propertyPath: spotId
+      value: green_mine.gold_coin_01
+      objectReference: {fileID: 0}
     - target: {fileID: 6954027970904031454, guid: 0f0d2ba66672f4f35936ac87efc5b77c, type: 3}
       propertyPath: m_LocalPosition.x
       value: 8
@@ -2095,6 +2145,8 @@ MonoBehaviour:
   player: {fileID: 505378730}
   levelTitle: GOLD COIN TEST
   goldTarget: 500
+  progress: {fileID: 368708510}
+  areaId: green_mine
   digDuration: 0.45
 --- !u!114 &1897796246
 MonoBehaviour:
@@ -2595,3 +2647,4 @@ SceneRoots:
   - {fileID: 1897796247}
   - {fileID: 1001373526}
   - {fileID: 1655111083}
+  - {fileID: 368708511}
