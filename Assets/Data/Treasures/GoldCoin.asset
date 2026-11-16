@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Treasure.TreasureDefinition
   id: gold_coin
   displayName: Gold Coin
+  rarity: 0
   goldValue: 10
+  modelPrefab: {fileID: 776975174772028223, guid: cc007de77f6134436a3262eeac2a80f2, type: 3}
+  feedbackProfile: {fileID: 11400000, guid: 2e8207552634c4453a42985d505837cf, type: 2}
   detectionRadius: 15
   digRadius: 2.5
   collectRadius: 3
