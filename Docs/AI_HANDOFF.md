@@ -9,10 +9,23 @@ Rules for whichever agent picks this up:
 5. No new packages without asking. Update this file when you finish or stop (even if the task is half done).
 
 ## Current state (2026-11-16)
-- Branch: `feature/rarity-feedback` (from `origin/main` @ `8978854`). Stage 4 (rarity reward feedback + gold progress bar fix) is COMMITTED
-  and PUSHED to `origin/feature/rarity-feedback` (message `feat: add rarity reward feedback and fix gold progress bar`; hash: see
-  `git log`). A Pull Request into `main` is open (not merged). `main` contains stages 1-3.
+- Branch: `feature/rarity-feedback`. Commit `2f781bb` (rarity reward feedback + gold progress bar fix) and the follow-up commit
+  `fix: guard safe area layout against invalid screen dimensions` (SafeAreaFitter hardening + tests + docs) are pushed; PR #4 into `main` is OPEN
+  (not merged). Nothing is uncommitted at the time of writing (see `git log` for hashes).
 - Last agent: Claude Code. Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
+
+## Manual Play Mode investigation (after PR #4) - HUD vanished / WASD ignored
+See `Docs/KnownIssues.md` ("Manual Play Mode report") for the full evidence. Summary:
+- Console of the user's manual run: `Invalid AABB inAABB` (TMP) + `IsFinite(gain)` (PlayOneShot in `DetectorSignalIndicator.HandlePulse`).
+  Both reproduced exactly by emulating `SafeAreaFitter`'s unguarded division at screen size 0 (NaN anchors -> NaN HUD rects / NaN audio position).
+- CODE CHANGE: `Assets/Scripts/UI/SafeAreaFitter.cs` - new `TryComputeAnchors(safeArea, screenSize, out min, out max)` rejects zero/negative/NaN/
+  Infinity input; `ApplySafeArea` keeps current anchors and retries next frame. NEW `Assets/Tests/PlayMode/SafeAreaFitterPlayModeTests.cs` (9 cases).
+- WASD: NOT a code bug. Input System default routes keyboard to the Editor when the Game View is unfocused (reproduced: focused -> moves,
+  unfocused -> no movement). Click inside the Game View once after entering Play Mode.
+- NOT proven: what made the screen size degenerate in the user's run, and why the `UI Canvas` looked greyed (no script deactivates it).
+- Verified after the fix: manual Play Mode (HUD visible, W/D move the Player, dig/collect -> `+10 Gold`, `10 / 500 GOLD`, fill 0.02, Console 0 errors);
+  `SafeAreaFitterPlayModeTests` 9/9; full PlayMode suite ONE run **41/41 PASSED**, Console 0 errors / 0 warnings. The old intermittent Player tests
+  are still unresolved in principle (see Known Issues) even though they passed in this run.
 
 ## Done on `main` (do not recreate)
 - Stage 1: Player / Camera / `VirtualJoystick` / `HudController` (+ `SafeAreaFitter`), prefabs `Player` / `PlayerUI`, scene

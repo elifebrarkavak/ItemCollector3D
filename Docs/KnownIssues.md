@@ -83,3 +83,36 @@ was shown to fail on the old sprite-less setup.
 `AudioSource.isPlaying` observed), but nobody has listened to it yet, so audibility, volume and pitch on a real device are unverified.
 This is NOT a report that the sound is silent. Same for the detector beep. Real Android device testing is also still pending.
 
+## Manual Play Mode report: HUD vanished and WASD ignored (investigated after PR #4)
+
+A manual Play Mode run of `GameplayTest` showed no HUD (title, bar, joystick, NO SIGNAL), a greyed `UI Canvas` in the Hierarchy and
+WASD doing nothing. The Console of that run held 161 errors (16:20:28-16:20:45 UTC): 64+ x `Invalid AABB inAABB` (from
+`TextMeshProUGUI.GenerateTextMesh` -> `CanvasRenderer.SetMesh`) and 36+ x `Assertion failed on expression: 'IsFinite(gain)'`
+(from `AudioSource.PlayOneShot` <- `DetectorSignalIndicator.HandlePulse`).
+
+**HUD / Console errors - what is PROVEN**
+- Both error signatures are produced by NaN RectTransforms under `SafeAreaRoot`: emulating what `SafeAreaFitter.ApplySafeArea` computes for
+  a zero-sized screen (`safeArea / (0,0)`) made every HUD rect NaN, TMP logged `Invalid AABB inAABB`, and once the detector pulsed
+  `PlayOneShot` logged `IsFinite(gain)` with the same stack (the detector `AudioSource` sits on a UI object, so its position was NaN too).
+- `SafeAreaFitter` had no guard against zero/NaN screen size -> real code defect. FIXED (see below).
+- In a normal Game View (1571x1044) Play Mode showed the HUD, an active `UI Canvas`, an `EventSystem`, a grounded Player and 0 Console errors.
+
+**NOT proven**
+- What made the screen size degenerate in the manual run. Edit Mode reported `Screen = 3024x72` (a hidden / collapsed / very flat Game
+  View is the likely area) but that is a guess, not a finding.
+- Why the `UI Canvas` appeared greyed in the Hierarchy. No project script deactivates it (`SetActive` is only used for HUD buttons, treasure
+  visuals and a glow light); with NaN layout the canvas stays `activeSelf = True`. It may have been toggled by hand - unknown.
+
+**Fix (small hardening, committed on `feature/rarity-feedback` as part of PR #4):** `SafeAreaFitter.TryComputeAnchors` rejects zero/negative/NaN/Infinity screen size or
+safe area, keeps the current (full-stretch) anchors and retries next frame. Tests: `SafeAreaFitterPlayModeTests` (9 cases).
+
+**WASD - what is PROVEN (not a code bug)**
+- The project has no Input Settings asset, so the Input System default `PointersAndKeyboardsRespectGameViewFocus` applies: when the Game View
+  does not have focus, keyboard events go to the Editor and the game does not see them.
+- Controlled test: Editor focused -> W moved the Player (z 0 -> 22 at ~5 m/s, `moveInput = (0,1)`, grounded). Another app in front
+  (`Application.isFocused = False`) -> the keyboard device reported W pressed but the Player's `moveInput` stayed `(0,0)` and it did not move.
+- **To play manually: click inside the Game View once after entering Play Mode.** No code change was made for this.
+- NOT proven: that the manual run was unfocused (not observable now). Optional (not applied): an Input Settings asset with
+  `editorInputBehaviorInPlayMode = AllDeviceInputAlwaysGoesToGameView` would route keys to the game even without focus, but would also let
+  Editor typing reach the game, so it was left to the team to decide.
+
