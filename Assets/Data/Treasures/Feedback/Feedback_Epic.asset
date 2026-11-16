@@ -15,5 +15,7 @@ MonoBehaviour:
   announcement: EPIC!
   accentColor: {r: 0.75, g: 0.4, b: 1, a: 1}
   effectIntensity: 1
+  glow: 1
+  soundPitch: 1.5
   collectSound: {fileID: 0}
   collectParticlesPrefab: {fileID: 0}

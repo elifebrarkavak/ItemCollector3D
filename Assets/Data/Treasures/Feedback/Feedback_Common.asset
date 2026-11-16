@@ -15,5 +15,7 @@ MonoBehaviour:
   announcement: 
   accentColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   effectIntensity: 0.25
+  glow: 0
+  soundPitch: 1
   collectSound: {fileID: 0}
   collectParticlesPrefab: {fileID: 0}

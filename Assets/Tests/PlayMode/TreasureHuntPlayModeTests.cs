@@ -231,7 +231,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 p = player.position;
                 float distance = spot.HorizontalDistanceTo(p);
                 Color dotColor = flashDot.color;
-                sawFlash |= dotColor.r > 0.9f && dotColor.g > 0.7f && dotColor.b < 0.5f;
+                sawFlash |= dotColor.r > 0.8f && dotColor.g > 0.6f && dotColor.b < 0.4f; // idle dot is grey (0.35, 0.35, 0.35)
                 sawAudio |= audioSource.isPlaying;
                 minY = Mathf.Min(minY, p.y);
                 maxY = Mathf.Max(maxY, p.y);
