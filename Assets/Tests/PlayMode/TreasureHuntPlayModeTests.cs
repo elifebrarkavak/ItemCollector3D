@@ -137,7 +137,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(digButton.gameObject.activeSelf, Is.True, "DIG must show in dig range.");
             Assert.That(collectButton.gameObject.activeSelf, Is.False, "COLLECT must not show before reveal.");
             digButton.onClick.Invoke();
-            yield return null;
+            yield return WaitForRevealed(spot);
             Assert.That(spot.State, Is.EqualTo(TreasureState.Revealed));
             Assert.That(visual.gameObject.activeSelf, Is.True, "Treasure must be visible after DIG.");
             Assert.That(digButton.gameObject.activeSelf, Is.False);
@@ -277,7 +277,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(indicator.PulseCount, Is.GreaterThan(1));
 
             digButton.onClick.Invoke();
-            yield return null;
+            yield return WaitForRevealed(spot);
             Assert.That(spot.State, Is.EqualTo(TreasureState.Revealed));
             collectButton.onClick.Invoke();
             yield return null;
@@ -328,7 +328,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
                 Assert.That(digButton.gameObject.activeSelf, Is.True, $"DIG must show for {spot.Definition.DisplayName}.");
                 digButton.onClick.Invoke();
-                yield return null;
+                yield return WaitForRevealed(spot);
                 Assert.That(spot.State, Is.EqualTo(TreasureState.Revealed));
                 Assert.That(collectButton.gameObject.activeSelf, Is.True);
 
@@ -380,6 +380,18 @@ namespace ItemCollector3D.Tests.PlayMode
             controller.enabled = false;
             player.position = position;
             controller.enabled = true;
+        }
+
+        /// <summary>The dig now takes a short time (TreasureHuntController.digDuration): wait for the reveal.</summary>
+        private static IEnumerator WaitForRevealed(TreasureSpot spot, float timeoutSeconds = 3f)
+        {
+            float end = Time.time + timeoutSeconds;
+            while (spot.State == TreasureState.Hidden && Time.time < end)
+            {
+                yield return null;
+            }
+
+            yield return null; // let the controller refresh the buttons after the reveal
         }
 
         private static IEnumerator WaitSeconds(float seconds)

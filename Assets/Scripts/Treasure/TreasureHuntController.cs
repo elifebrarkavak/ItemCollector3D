@@ -16,12 +16,30 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private Transform player;
         [SerializeField] private string levelTitle = "GOLD COIN TEST";
         [SerializeField, Min(1)] private int goldTarget = 10;
+        [Tooltip("Seconds between pressing DIG and the treasure being revealed (Concept Document: short interactions). 0 = reveal instantly.")]
+        [SerializeField, Min(0f)] private float digDuration = 0.45f;
 
-        private bool digVisible;
+        // DIG button: 0 = hidden, 1 = ready, 2 = busy (visible but disabled while digging).
+        private int digButtonMode = -1;
         private bool collectVisible;
         private bool subscribed;
+        private TreasureSpot digTarget;
+        private float digElapsed;
 
         public int TotalGold { get; private set; }
+        public float DigDuration => digDuration;
+
+        /// <summary>True from DIG pressed until the treasure is revealed. A second DIG is ignored meanwhile.</summary>
+        public bool IsDigging => digTarget != null;
+
+        /// <summary>Raised when a dig starts: the spot being dug and the dig duration in seconds.</summary>
+        public event Action<TreasureSpot, float> DigStarted;
+
+        /// <summary>Raised right after the treasure was revealed by a finished dig.</summary>
+        public event Action<TreasureSpot> DigCompleted;
+
+        /// <summary>Raised when the player left the dig range during a dig: the treasure stays Hidden and DIG can be used again.</summary>
+        public event Action<TreasureSpot> DigCancelled;
 
         /// <summary>Raised after a treasure was collected and gold was added.</summary>
         public event Action<TreasureSpot, int> TreasureCollected;
@@ -46,7 +64,7 @@ namespace ItemCollector3D.Treasure
             }
 
             // Force the first button refresh to apply.
-            digVisible = true;
+            digButtonMode = -1;
             collectVisible = true;
             RefreshButtons();
         }
@@ -58,6 +76,24 @@ namespace ItemCollector3D.Treasure
 
         private void Update()
         {
+            if (IsDigging)
+            {
+                // The target is locked when DIG starts. The player may move while digging, but must stay inside the
+                // dig range; leaving it cancels the dig safely (the treasure stays Hidden, no reveal, no gold).
+                if (!IsInsideDigRange(digTarget))
+                {
+                    CancelDig();
+                }
+                else
+                {
+                    digElapsed += Time.deltaTime;
+                    if (digElapsed >= digDuration)
+                    {
+                        CompleteDig();
+                    }
+                }
+            }
+
             RefreshButtons();
         }
 
@@ -87,13 +123,63 @@ namespace ItemCollector3D.Treasure
 
         private void HandleDigRequested()
         {
-            TreasureSpot target = FindInRange(TreasureState.Hidden);
-            if (target != null)
+            if (IsDigging)
             {
-                target.Reveal();
+                return; // one dig at a time; the button is disabled but Invoke()/double taps must be safe too
+            }
+
+            TreasureSpot target = FindInRange(TreasureState.Hidden);
+            if (target == null)
+            {
+                return;
+            }
+
+            if (digDuration <= 0f)
+            {
+                if (target.Reveal())
+                {
+                    DigCompleted?.Invoke(target);
+                }
+            }
+            else
+            {
+                digTarget = target;
+                digElapsed = 0f;
+                DigStarted?.Invoke(target, digDuration);
             }
 
             RefreshButtons();
+        }
+
+        private bool IsInsideDigRange(TreasureSpot spot)
+        {
+            if (player == null || spot.Definition == null)
+            {
+                return true; // nothing to measure: do not cancel
+            }
+
+            return spot.HorizontalDistanceTo(player.position) <= spot.Definition.DigRadius;
+        }
+
+        private void CancelDig()
+        {
+            TreasureSpot target = digTarget;
+            digTarget = null;
+            digElapsed = 0f;
+            if (target != null)
+            {
+                DigCancelled?.Invoke(target);
+            }
+        }
+
+        private void CompleteDig()
+        {
+            TreasureSpot target = digTarget;
+            digTarget = null;
+            if (target != null && target.Reveal())
+            {
+                DigCompleted?.Invoke(target);
+            }
         }
 
         private void HandleCollectRequested()
@@ -117,13 +203,13 @@ namespace ItemCollector3D.Treasure
                 return;
             }
 
-            bool canDig = FindInRange(TreasureState.Hidden) != null;
+            int digMode = IsDigging ? 2 : FindInRange(TreasureState.Hidden) != null ? 1 : 0;
             bool canCollect = FindInRange(TreasureState.Revealed) != null;
 
-            if (canDig != digVisible)
+            if (digMode != digButtonMode)
             {
-                digVisible = canDig;
-                hud.SetDigState(canDig);
+                digButtonMode = digMode;
+                hud.SetDigState(digMode != 0, digMode == 1);
             }
 
             if (canCollect != collectVisible)

@@ -9,12 +9,88 @@ Rules for whichever agent picks this up:
 5. No new packages without asking. Update this file when you finish or stop (even if the task is half done).
 
 ## Current state (2026-11-16)
-- Branch: `feature/rarity-feedback`. Commit `2f781bb` (rarity reward feedback + gold progress bar fix) and the follow-up commit
-  `fix: guard safe area layout against invalid screen dimensions` (SafeAreaFitter hardening + tests + docs) are pushed; PR #4 into `main` is OPEN
-  (not merged). Nothing is uncommitted at the time of writing (see `git log` for hashes).
+- Branch: `feature/dig-feedback` (from `origin/main` @ `25df926`). Stage 5 (dig animation & feedback with range cancellation) is COMMITTED and
+  PUSHED to `origin/feature/dig-feedback` (message `feat: add dig animation and feedback with range cancellation`; hash: see `git log`).
+  A Pull Request into `main` is OPEN (not merged). `main` contains stages 1-4 incl. rarity reward feedback, the gold progress bar fix and
+  the SafeAreaFitter guard (PR #4 merged).
 - Last agent: Claude Code. Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
 
-## Manual Play Mode investigation (after PR #4) - HUD vanished / WASD ignored
+## Stage 5 (this branch, uncommitted): Dig animation & feedback
+Goal: DIG becomes a short dig experience (Detect -> DIG -> [dig 0.45 s: motion + dirt + sound] -> Reveal -> Collect -> Gold reward) with
+no new treasure system; `TreasureSpot` (Hidden -> Revealed -> Collected), HUD, rarity reward feedback and SafeAreaFitter are unchanged.
+
+Design / impact analysis: `TreasureSpot.Reveal()` and the HUD API stay synchronous and unchanged. The dig phase lives in
+`TreasureHuntController`. Consequence: every test that pressed DIG and asserted `Revealed` one frame later had to wait for the reveal.
+
+Code (`Assets/Scripts/Treasure/`):
+- CHANGED `TreasureHuntController` - new `digDuration` (default 0.45 s, 0 = instant like before), `IsDigging`, `DigStarted(spot, seconds)`,
+  `DigCompleted(spot)`, `DigCancelled(spot)`. While digging a second DIG is ignored and the DIG button is visible but disabled; the treasure is
+  revealed when the timer ends, then COLLECT appears. The target is LOCKED at DIG; the player may move while digging but must stay inside the
+  target's dig radius: leaving it cancels the dig (treasure stays Hidden, no reveal, no gold, no COLLECT, timer reset) and DIG is usable again
+  as soon as the player is back in range. A revealed/collected treasure cannot be dug again. (Exact radius, no grace margin.)
+- NEW `PlayerDigAnimator` (+ `Cancel()`: stops the motion and restores the rest pose at once; `CancelCount`) - placeholder dig motion (2 strokes: forward tilt + side roll + dip + squash) applied ONLY to a child `Visual`
+  (never the player root, so Transform / CharacterController / camera follow are untouched); restores the exact rest pose when finished or
+  disabled. Assign an `Animator` (+ trigger `Dig`) to switch to a real miner animation later; `visual` can point at the miner model.
+- NEW `DigDirtEffect` - ONE reusable ParticleSystem, earth-tone dirt (light/dark brown), 8 particles per stroke + 14 on reveal (30 per
+  dig, hard cap), wide cone, size 0.2-0.32 so it stays visible next to/around the player; opaque placeholder material (swap for final art).
+- NEW `DigSoundPlayer` - ONE AudioSource (a new play restarts, no stacking, 0.05 s repeat guard); procedural placeholder thud (no audio
+  files); assign `digClip` for a real sound; one sound per stroke (2 per dig).
+- NEW `DigFeedbackPresenter` - listens to `DigStarted` / `DigCompleted` / `DigCancelled`; fires animator, dirt and sound at each stroke
+  impact ((k+0.5)/strokes of the dig) and a final dirt puff on reveal; on cancel it stops the animator (no reveal puff, no more strokes).
+Assets / scene:
+- CHANGED `Assets/Prefabs/Player/Player.prefab` - the capsule `MeshFilter`/`MeshRenderer` moved from the root to a new child `Visual`
+  (same mesh/material/shadow settings); `PlayerDigAnimator` added on the root. Nothing else referenced the root renderer; scene
+  instances only override the transform.
+- NEW `Assets/Materials/DigDirt_Placeholder.mat` (URP Particles/Unlit, vertex colours).
+- CHANGED `GameplayTest.unity` (additions: `DigFeedback` object with presenter + dirt + sound + AudioSource; plus a harmless TMP
+  style-hash re-serialization).
+Tests:
+- NEW `Assets/Tests/PlayMode/DigFeedbackPlayModeTests.cs` (9 tests; the last four cover the DIG-only isolation and leave-range cancel,
+  see "Follow-up" below). Original 5: stroke curve maths; animator returns visual to rest when disabled
+  mid-dig; DIG only inside dig range; full sequence (feedback once, repeated DIG blocked, DIG visible-but-disabled, COLLECT hidden until
+  reveal, reveal after >= dig time, player root position/rotation untouched, camera follows, visual moved and restored, 2 strokes /
+  2 sounds / 30 dirt particles, alive particles, earth tones, dirt at the spot, collect gives gold once, collected treasure cannot be
+  dug again, reward text `+10 Gold`); Rare treasure keeps `RARE! +50 Gold`, burst count and glow.
+- CHANGED `TreasureHuntPlayModeTests.cs` (3 sites) and `RewardFeedbackPlayModeTests.cs` (1 site): wait for the reveal after DIG.
+
+### Test results (real, stage 5)
+- Compile: 0 errors, 0 warnings. Targeted `DigFeedbackPlayModeTests`: 5/5 PASSED (first run).
+- Full PlayMode suite, ONE run: **46/46 PASSED**. Console after: 0 errors, 0 warnings. The older intermittent Player tests passed
+  again but their cause is still NOT proven (see Known Issues); green runs do not resolve them.
+- Manual Game View check (Editor, slow motion 0.035x, real scene, coin directly ahead of the player = worst case for occlusion):
+  the Player visibly dips and leans/rolls per stroke and returns upright; a cloud of light/dark brown dirt is clearly visible on both
+  sides of the capsule and rises/shrinks over ~0.9 s; the treasure is revealed and the reward text `+10 Gold` follows. (First capture
+  with smaller particles showed only ~5 specks - sizes/cone were increased and the prefab/scene values updated.)
+  Aside: in that run the end state was `Collected` although the script only pressed DIG - see the follow-up below (not reproduced).
+
+### Follow-up in stage 5: DIG-only isolation and cancel on leaving the dig range
+1. **Unexpected `Collected` after only DIG - NOT reproduced.** Static review: the only path to `TreasureSpot.Collect()` is
+   `TreasureHuntController.HandleCollectRequested`, subscribed only to `HudController.CollectRequested`, raised only by the CollectButton `onClick`;
+   no persistent onClick listeners exist in the prefab/scene. Instrumented Play Mode repro (same procedure as before: coin ahead, slow motion
+   0.035x, script presses only DIG, with stack-trace logging on both buttons and on `TreasureCollected`): ended `Revealed`, gold 0, exactly one
+   click logged (DIG, programmatic, nothing selected), no COLLECT click, no collected event. NEW isolated test
+   `Scene_DigOnly_RevealsWithoutCollecting_AndNeverAutoCollects` (Hidden -> Digging -> Revealed, gold unchanged, no `TreasureCollected`, no reward,
+   COLLECT available, still Revealed after 2 s, then COLLECT -> Collected, gold 10 once, reward once, repeats safe) passes. Conclusion: no code
+   evidence of an automatic collect; the earlier `Collected` was most likely a manual click on COLLECT (not confirmed). No code was changed for it.
+   Note for UX: DIG (disabled during the dig) and COLLECT occupy the same spot, so a human double-tap on DIG can land on COLLECT at the reveal.
+2. **Leave-range cancel implemented** (see controller bullet). New tests: `Scene_PlayerMovingInsideDigRange_DigStillCompletes`,
+   `Scene_PlayerLeavingDigRange_CancelsDigSafely_AndDigCanBeRepeated` (cancel, Hidden, no gold/COLLECT/reward, animation at rest, no late
+   reveal after the dig time, DIG usable again, repeated DIG ignored, second dig completes, COLLECT gold once + `+10 Gold` once),
+   `Animator_Cancel_RestoresRestPose_AndIsIdempotent`; the earlier tests also assert the pose is restored after a normal finish.
+3. Results: `DigFeedbackPlayModeTests` **9/9 PASSED**; full PlayMode suite ONE run **50/50 PASSED**, Console 0 errors / 0 warnings. Manual
+   real-movement check in the Game View (slow motion, injected S key, Editor focused): dig started 2.1 m from the coin, walking past 2.5 m
+   cancelled it once (`DigCancelled`), treasure Hidden, animation at rest, DIG hidden, no COLLECT, gold 0, no completed/collected events.
+   The cancel pose-reset was verified numerically (`IsAtRest`), not by a dedicated screenshot.
+
+### Stage 5 limitations (not verified / open)
+- **Dig sound audibility: NOT yet tested by a human** (only that it is triggered twice per dig, once per stroke). Not a claim of silence.
+- Dig visuals were checked in the Editor Game View only; look and performance on a real Android phone are NOT verified. Motion is a
+  capsule placeholder (no miner model/Animator yet); dirt particles are plain squares.
+- Player was driven by teleport/injected key events in tests; a physical keyboard and the on-screen joystick during a dig were not exercised
+  (joystick tests from earlier stages still pass). Movement is not locked during the 0.45 s dig; leaving the dig radius cancels it.
+- While digging, the DIG button stays visible but disabled (a design choice; hiding it would also work).
+
+## Manual Play Mode investigation (merged to `main`, PR #4) - HUD vanished / WASD ignored
 See `Docs/KnownIssues.md` ("Manual Play Mode report") for the full evidence. Summary:
 - Console of the user's manual run: `Invalid AABB inAABB` (TMP) + `IsFinite(gain)` (PlayOneShot in `DetectorSignalIndicator.HandlePulse`).
   Both reproduced exactly by emulating `SafeAreaFitter`'s unguarded division at screen size 0 (NaN anchors -> NaN HUD rects / NaN audio position).
@@ -37,7 +113,7 @@ See `Docs/KnownIssues.md` ("Manual Play Mode report") for the full evidence. Sum
   Gold Nugget Uncommon 25, Gold Bar Rare 50, Ancient Artifact Epic 100), four profiles, PLACEHOLDER primitive models
   (final art = Sibel), spot prefabs, data tests.
 
-## Stage 4 (this branch, uncommitted): Rarity reward feedback
+## Stage 4 (merged to `main`, PR #4): Rarity reward feedback
 Goal: when a treasure is collected the player clearly sees and hears the reward; look/feel comes from the feedback PROFILE data.
 
 Code (`Assets/Scripts/Treasure/`):
@@ -70,7 +146,7 @@ Tests:
   detector scene test (strength far < mid < near, interval logic still speeds up, treasure state untouched).
 - CHANGED `TreasureHuntPlayModeTests.cs` - the flash check now accepts the weaker flash colours of the new strength scaling.
 
-### Gold Progress Bar fix (also uncommitted on this branch)
+### Gold Progress Bar fix (merged to `main`, PR #4)
 - Root cause: `GoldProgressFill` (Image, Filled / Horizontal) had NO sprite, so Unity drew the full bar regardless of
   `fillAmount` (HUD text and `fillAmount` were correct). Confirmed in the Editor on the prefab, and reproduced in Play Mode.
 - Fix: NEW `Assets/UI/Sprites/WhiteSquare.png` (+ `.meta`, 8x8 white, Sprite) assigned to `GoldProgressFill` in
@@ -122,10 +198,18 @@ Tests:
 - 2.8: lightweight audio/particle/floating-text feedback for mobile (done at placeholder level). Still Android-targeted, third-person,
   no combat/enemies/online/complex economy. Main Menu, Area Selection, persistent treasury, Green Mine and other areas: NOT in this stage.
 
+## Concept Document v1.0 check for stage 5 (2.6 Atmosphere, 2.7 Game Play, 2.8 Key Features)
+- 2.6: "Digging uses a short animation, dirt particles, and a sound cue" - DONE at placeholder level (0.45 s animation, earth-tone dirt, dig
+  sound; low particle count for mobile). Collection feedback / rarity feedback unchanged.
+- 2.7: "At the valid position, the contextual Dig button appears. Digging reveals the treasure; the button then changes to Collect." - kept
+  (DIG in range -> dig phase -> reveal -> COLLECT). Short interaction, no failure state. Optional haptics NOT done.
+- 2.8: lightweight audio/particle feedback for mobile, single-player Android, third-person; no combat/enemies/online/economy added.
+- Not in this stage by decision: Green Mine map, Main Menu, Area Selection, other areas, final miner model/Animator, persistent treasury.
+
 ## Next steps (suggested, in order)
-1. Merge the stage 4 PR only when the user decides to. The particle occlusion / subtle-particle item is logged in `Docs/KnownIssues.md`.
-2. (Done on this branch) HUD progress bar sprite fix. Optional polish: animated fill, final art.
-3. Dig feedback (short dig animation, dirt particles, dig sound) and counter animation; optional haptics.
+1. Review stage 5; commit only when the user allows it (suggested: `feat: add dig animation, dirt particles and dig sound`).
+2. Optional polish: HUD counter animation, animated progress fill, haptics, final miner model + Animator (assign to `PlayerDigAnimator`).
+3. Human check of dig/collect/detector sounds and of the effects on a real phone (see Known Issues).
 4. Area Complete / New Area Unlocked + persistent treasury; Main Menu and Area Selection.
 5. Green Mine scene (Beyza) and other areas; final models/particles/audio (Sibel) via profile overrides.
 6. Android build, add real scenes to Build Settings, device test (touch, audio, performance).

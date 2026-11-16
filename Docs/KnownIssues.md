@@ -116,3 +116,27 @@ safe area, keeps the current (full-stretch) anchors and retries next frame. Test
   `editorInputBehaviorInPlayMode = AllDeviceInputAlwaysGoesToGameView` would route keys to the game even without focus, but would also let
   Editor typing reach the game, so it was left to the team to decide.
 
+## Dig feedback (stage 5, branch `feature/dig-feedback`): open points
+
+- **Dig sound audibility: not yet tested by a human.** The code path is verified (triggered once per stroke, 2 per dig, through one AudioSource
+  with pitch/volume set), but nobody has listened to it. This is NOT a claim that it is silent. Same status as the collect sound and the
+  detector beep above.
+- **Placeholders:** the dig motion (tilt/roll/dip/squash of a child `Visual`), the square brown dirt particles and the procedural thud are
+  placeholders; checked only in the Editor Game View (slow-motion captures), not on a real Android device, and not profiled.
+- **Movement during a dig (resolved in this branch):** the target is locked at DIG; the player may move but leaving the dig radius cancels the
+  dig (treasure stays Hidden, animation back to rest, DIG usable again in range). Exact radius, no grace margin.
+- **Unexplained observation (not reproduced):** in one manual run the treasure ended `Collected` although only DIG was pressed by the script.
+  A controlled, instrumented repro (stack logging on both buttons and `TreasureCollected`) ended `Revealed` with gold 0 and only the DIG click
+  logged; the only code path to `Collect()` is the CollectButton click. A manual click on COLLECT is the likeliest cause but is NOT confirmed.
+  Note: DIG (disabled while digging) and COLLECT share the same screen spot, so a human double-tap on DIG may hit COLLECT at the reveal.
+
+## UX observation: DIG and COLLECT share the same position (needs real Android evaluation)
+
+DIG ve COLLECT butonları aynı konumda bulunduğundan hızlı çift dokunma istenmeden COLLECT tetikleyebilir. Bu davranışın gerçek Android
+cihazda değerlendirilmesi gerekiyor.
+
+(English: the DIG and COLLECT buttons sit at the same spot - DIG stays visible but disabled during the 0.45 s dig and COLLECT replaces it at
+the reveal - so a quick double tap on DIG could trigger COLLECT unintentionally. Not reproduced in code or tests, where the only collect path is a
+CollectButton click; it must be evaluated on a real Android device. Possible mitigations if it turns out to be a problem: a short input
+lockout on COLLECT after the reveal, or separate button positions. Neither is implemented.)
+

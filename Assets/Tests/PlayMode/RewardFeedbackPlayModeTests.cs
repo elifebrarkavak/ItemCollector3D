@@ -149,7 +149,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 yield return null;
                 yield return null;
                 digButton.onClick.Invoke();
-                yield return null;
+                yield return WaitForRevealed(row.spot);
                 yield return WaitSeconds(0.1f); // real play never collects twice within the sound repeat guard
                 collectButton.onClick.Invoke();
                 yield return null;
@@ -281,6 +281,18 @@ namespace ItemCollector3D.Tests.PlayMode
             controller.enabled = false;
             player.position = position;
             controller.enabled = true;
+        }
+
+        /// <summary>The dig now takes a short time (TreasureHuntController.digDuration): wait for the reveal.</summary>
+        private static IEnumerator WaitForRevealed(TreasureSpot spot, float timeoutSeconds = 3f)
+        {
+            float end = Time.time + timeoutSeconds;
+            while (spot.State == TreasureState.Hidden && Time.time < end)
+            {
+                yield return null;
+            }
+
+            yield return null; // let the controller refresh the buttons after the reveal
         }
 
         private static IEnumerator WaitSeconds(float seconds)
