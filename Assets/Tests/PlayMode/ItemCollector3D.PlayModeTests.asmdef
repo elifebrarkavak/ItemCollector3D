@@ -1,0 +1,22 @@
+{
+  "name": "ItemCollector3D.PlayModeTests",
+  "rootNamespace": "ItemCollector3D.Tests.PlayMode",
+  "references": [
+    "ItemCollector3D.Runtime",
+    "Unity.InputSystem",
+    "UnityEngine.UI",
+    "Unity.TextMeshPro"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
