@@ -91,12 +91,33 @@ No existing scene, prefab or script was modified. Beyza's GreenMine scene was no
 - HUD title is still "GOLD COIN TEST" (`TreasureHuntController.levelTitle`); Beyza's GreenMine scene does not exist
   yet and was not touched - when it does, add the treasure systems there and set goldTarget to its own total.
 
-## OPEN NEXT TASK (not done): Concept Document v1.0 compliance audit
-The Concept Document v1.0 is the core design reference, but it was not available in the repo/workspace, so the
-Treasure MVP has NOT been checked against it. Next agent: obtain the document from the user, compare it with the
-"Done on this branch" list (loop, detector behaviour, DIG/COLLECT flow, gold values/targets, scene structure), and
-record gaps here before adding more features. `GameplayTest` is a single-treasure technical prototype, not the main
-game scene.
+## Concept Document v1.0 audit (done 2026-11-16; document: YAM415_G09_ConceptDocument v1.0, sections 2.4-2.9)
+Verdict: NO contradictions found; the prototype is a correct technical slice of the document's core loop.
+`GameplayTest` is a single-treasure technical prototype, NOT the main game scene; missing sections are not failures.
+
+IMPLEMENTED: third-person camera behind/above + right-side swipe orbit + left virtual joystick; contextual DIG/COLLECT
+buttons (DIG at valid position, then COLLECT); hidden (invisible) treasure; distance-based detector with accelerating
+beeps (pitch rises, interval 1.6 s -> 0.15 s); Dig reveals, Collect adds gold; Gold Coin = 10 gold; Green Mine target
+500 in the HUD (`0 / 500` -> `10 / 500`); one treasure cannot be collected twice; no combat/death/failure state.
+PARTIALLY IMPLEMENTED: shared collectible system (`TreasureDefinition` has name, gold value, ranges but NO rarity,
+model or feedback profile); detector "weak -> strong" visual indicator (dot flash intensity and beep volume are
+constant; only interval, pitch and the SIGNAL % label change; doc names slow/fast/rapid states, we use a continuous
+curve - fine, doc says timing is set by playtesting); touch controls (joystick/swipe exist and are PlayMode-tested,
+DIG/COLLECT verified via onClick, never on a real touchscreen); HUD shows level title + gold (title is "GOLD COIN TEST",
+not an area name).
+PLANNED / NOT YET BUILT: Main Menu and Area Selection; rarity tiers (Common 10, Uncommon 25 Gold Nugget, Rare 50
+Gold Bar, Epic 100 Ancient Artifact); rarity-specific feedback ("RARE! +50 Gold"); Dig animation + dirt particles +
+dig sound; collect particle burst, collect sound, floating gold text, counter animation; optional haptics; Area
+Complete / New Area Unlocked / return to Area Selection; area unlocking; persistent treasury across areas ("leaving an
+area does not erase progress"); Rocky Canyon (1200 total) and Ancient Mine (2500 total); multiple treasures per area;
+Green Mine scene (Beyza); Android build + device testing; style pass (warm earth/green/rock tones, gold glow).
+DESIGN NOTES FOR LATER (not conflicts): (1) Rocky Canyon / Ancient Mine targets are CUMULATIVE ("total gold"), but
+`TreasureHuntController.TotalGold` currently lives in the scene - needs a persistent treasury (and HUD target logic)
+before area 2; `HudController.SetGold` also clamps to the target. (2) `GameplayTest` is not in Build Settings (only
+SampleScene is) - add the real scenes when building for Android. (3) The document says the exact Unity version is to
+be recorded: project uses 6000.6.9f1.
+Suggested order: rarity in `TreasureDefinition` -> feedback profile (floating text/particles/sounds) -> Area Complete +
+treasury persistence -> Main Menu/Area Selection -> more areas -> Android device test.
 
 ## Next steps
 1. User reviews the branch; commit when the user allows it (suggested message: `feat: add single-treasure gold coin MVP`).
