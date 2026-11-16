@@ -1,4 +1,5 @@
 using System;
+using ItemCollector3D.Menus;
 using ItemCollector3D.Progress;
 using ItemCollector3D.UI;
 using UnityEngine;
@@ -226,7 +227,7 @@ namespace ItemCollector3D.Treasure
 
         private void HandleDigRequested()
         {
-            if (IsDigging || !IsAreaAccessible)
+            if (IsDigging || !IsAreaAccessible || GamePause.IsPaused)
             {
                 return; // one dig at a time (Invoke()/double taps must be safe); a locked area cannot be played
             }
@@ -287,6 +288,11 @@ namespace ItemCollector3D.Treasure
 
         private void HandleCollectRequested()
         {
+            if (GamePause.IsPaused)
+            {
+                return; // gameplay is frozen while paused
+            }
+
             TreasureSpot target = FindInRange(TreasureState.Revealed);
             if (target != null && target.Collect())
             {

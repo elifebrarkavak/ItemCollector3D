@@ -1,3 +1,4 @@
+using ItemCollector3D.Menus;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -64,11 +65,18 @@ namespace ItemCollector3D.Player
 
         private void ReadOrbitInput()
         {
+            if (GamePause.IsPaused)
+            {
+                return; // the orbit reads raw input without deltaTime, so it must be stopped explicitly while paused
+            }
+
+            float sensitivityScale = GameSettings.CameraSensitivityScale; // Settings > Camera Sensitivity
+
             if (Mouse.current != null && Mouse.current.rightButton.isPressed)
             {
                 Vector2 delta = Mouse.current.delta.ReadValue();
-                yaw += delta.x * mouseSensitivity;
-                pitch -= delta.y * mouseSensitivity;
+                yaw += delta.x * mouseSensitivity * sensitivityScale;
+                pitch -= delta.y * mouseSensitivity * sensitivityScale;
             }
 
             if (Touchscreen.current == null)
@@ -103,8 +111,8 @@ namespace ItemCollector3D.Player
                 if (touch.press.isPressed)
                 {
                     Vector2 delta = touch.delta.ReadValue();
-                    yaw += delta.x * touchSensitivity;
-                    pitch -= delta.y * touchSensitivity;
+                    yaw += delta.x * touchSensitivity * sensitivityScale;
+                    pitch -= delta.y * touchSensitivity * sensitivityScale;
                 }
 
                 if (touch.press.wasReleasedThisFrame)

@@ -157,3 +157,18 @@ lockout on COLLECT after the reveal, or separate button positions. Neither is im
   provider remains a global hook - keep it in mind when adding scenes.
 - **Catalog edits after players saved:** unlock/complete flags are recomputed from the saved gold on load (repair warning, notifications not replayed).
 
+## Game menus (stage 7, branch `ebrar`): open points
+
+- **Nothing about the menus was tested on a real Android device:** touch on the buttons and sliders, the Android Back key (mapped to Escape), the landscape-only
+  orientation, PlayerPrefs, and menu-scene performance are unverified. Settings and pause were checked in the Editor Game View (1280x720 captures) and by automated tests.
+- **Audibility not tested by a human:** the Music Volume / SFX Volume settings are verified by the numbers they produce (volumes scale, music loudness follows the slider) -
+  nobody has listened to the procedural ambient music, the SFX at different levels, or the banner. Not a claim that they are silent.
+- **Placeholder art:** the Main Menu scenery, miner and UI are primitives and flat colours; final models/UI art are a later stage. The menu scenery was not profiled.
+- **No Vibration setting** on purpose (nothing vibrates yet). **No Area Selection / Character Selection** (Concept Document: Main Menu -> Area Selection -> area).
+- **Build Settings and orientation changed:** MainMenu is now scene 0 (a build starts at the menu); the project is landscape-only (auto-rotate left/right). Beyza's / Sibel's
+  scenes must be added to Build Settings when they exist.
+- **Manual play uses real storage:** progress (JSON file) and settings (Editor PlayerPrefs) persist between Play sessions; tests never touch them. Delete the progress file or use
+  `ProgressManager` > "Reset Saved Progress" to start fresh. Pausing sets `Time.timeScale = 0`; code that must run while paused should use unscaled time (the notification banner does).
+- **Bug found and fixed in this stage (kept for the record):** opening Settings used to overwrite the saved Camera Sensitivity (slider min/max clamp fired onValueChanged);
+  fixed with a refresh guard and a regression test.
+

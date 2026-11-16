@@ -1,3 +1,4 @@
+using ItemCollector3D.Menus;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +36,9 @@ namespace ItemCollector3D.Treasure
 
         /// <summary>Strength (0..1) of the most recent pulse: weak far away, strong when close.</summary>
         public float LastPulseStrength { get; private set; }
+
+        /// <summary>Volume scale of the most recent beep (proximity strength x Settings SFX volume).</summary>
+        public float LastBeepVolume { get; private set; }
 
         public static float StrengthFor(float proximity, float weakest)
         {
@@ -99,7 +103,8 @@ namespace ItemCollector3D.Treasure
             if (audioSource != null && beep != null)
             {
                 audioSource.pitch = Mathf.Lerp(0.8f, 1.6f, proximity);
-                audioSource.PlayOneShot(beep, Mathf.Lerp(weakestBeepVolume, strongestBeepVolume, flashStrength));
+                LastBeepVolume = Mathf.Lerp(weakestBeepVolume, strongestBeepVolume, flashStrength) * GameSettings.SfxScale; // Settings > SFX Volume
+                audioSource.PlayOneShot(beep, LastBeepVolume);
             }
         }
 

@@ -1,3 +1,4 @@
+using ItemCollector3D.Menus;
 using UnityEngine;
 
 namespace ItemCollector3D.Treasure
@@ -55,7 +56,7 @@ namespace ItemCollector3D.Treasure
 
             lastPlayTime = Time.unscaledTime;
             LastPitch = profile != null ? profile.SoundPitch : 1f;
-            LastVolume = baseVolume * Mathf.Lerp(minVolumeFactor, 1f, Mathf.Clamp01(intensity));
+            LastVolume = baseVolume * Mathf.Lerp(minVolumeFactor, 1f, Mathf.Clamp01(intensity)) * GameSettings.SfxScale; // Settings > SFX Volume
 
             source.Stop();
             source.clip = clip;

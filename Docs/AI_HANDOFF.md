@@ -9,17 +9,74 @@ Rules for whichever agent picks this up:
 5. No new packages without asking. Update this file when you finish or stop (even if the task is half done).
 
 ## Current state (2026-11-16)
-- Branch: `ebrar` (started at `main` @ `86a5e20`). Stage 6 (game progression & save system) is COMMITTED and PUSHED to `origin/ebrar`
-  (message `feat: add persistent progression and save system`; hash: see `git log`). A Pull Request `ebrar` -> `main` is OPEN (not merged).
-  `main` contains stages 1-5 (everything up to dig animation & feedback).
+- Branch: `ebrar`. Stage 6 (persistent progression, commit `f071a90`) and stage 7 (game menus, commit `feat: add main menu settings pause and notifications`; hash: see
+  `git log`) are both COMMITTED and PUSHED to `origin/ebrar`. NOTE: PR #6 (stage 6) uses `ebrar` as its head branch, so it now also contains the stage 7 commit
+  (its description was written for stage 6 only and was not edited). PR #6 is still OPEN and NOT merged. Stage 7 reads the stage 6 `ProgressManager` events.
 - Last agent: Claude Code. Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
-- **Manual-testing note:** `GameplayTest` now has a `ProgressManager` that saves to a REAL file
-  (`<Application.persistentDataPath>/item_collector_progress.json`; on this Mac
-  `~/Library/Application Support/DefaultCompany/ItemCollector3DStaging/`). After you collect the coin in Play Mode it stays collected and the
-  gold stays 10 in the next Play. To start fresh: delete that file, or right-click the `ProgressManager` component > "Reset Saved Progress".
-  Automated tests never touch the file (in-memory store).
+- **Manual-testing notes:** the game saves to a REAL file (`~/Library/Application Support/DefaultCompany/ItemCollector3DStaging/item_collector_progress.json`,
+  see stage 6) and settings go to the Editor's PlayerPrefs. Automated tests use in-memory stores for both and never touch them. The user's own save
+  (totalGold 10, coin collected) was backed up and restored byte for byte around my manual visual runs.
 
-## Stage 6 (branch `ebrar`, PR open): Game progression & save system
+## Stage 7 (branch `ebrar`, pushed; inside PR #6): Game menus - Main Menu, Settings, Pause, progress notifications
+Flow: Main Menu -> PLAY -> GameplayTest -> PAUSE -> SETTINGS -> RESUME -> PAUSE -> MAIN MENU. No Area Selection / Character Selection (later stages).
+
+Code - NEW `Assets/Scripts/Menus/` (namespace `ItemCollector3D.Menus`):
+- `GameSettings` (+ `ISettingsStore`, `PlayerPrefsSettingsStore`, `MemorySettingsStore`): Music volume (0..1, default 0.8), SFX volume (0..1, default 1),
+  Camera sensitivity (0.25..2, default 1). Clamped, NaN/Infinity/missing values fall back to safe values, saved to PlayerPrefs on every change,
+  `Changed` event. Shared instance `GameSettings.Current` (`StoreFactoryOverride` + `ResetCurrent()` for tests); static `SfxScale`, `CameraSensitivityScale`.
+- `GamePause` (static): `Pause()` sets `Time.timeScale = 0` and `AudioListener.pause = true`, `Resume()` restores the previous time scale; `IsPaused`, `Changed`.
+- `SceneNavigator` (static): `Load(sceneName)` resumes first, then `SceneManager.LoadScene`; `LoadHook` for tests; names `MainMenu`, `GameplayTest`.
+- `SettingsPanelController`: the ONE settings panel (3 sliders + value labels + BACK); shows stored values on open without firing changes.
+- `MainMenuController`: PLAY (loads `GameplayTest`), SETTINGS (hides the buttons, shows the panel), EXIT (`Application.Quit`, stops Play Mode in the Editor; `ExitHook` for tests).
+- `PauseMenuController`: PAUSE button, panel with RESUME / SETTINGS / MAIN MENU, Escape (Android Back) toggles pause / closes settings; always resumes on
+  leave/destroy so a scene never starts frozen.
+- `NotificationBanner` (pop-in, hold, fade on UNSCALED time, never blocks touches) + `ProgressNotificationPresenter`: listens to the EXISTING
+  `ProgressManager.AreaCompleted` / `AreaUnlocked`, shows "AREA COMPLETE!" and "NEW AREA UNLOCKED!" (+ area name) one after another from a queue, each
+  (kind, area) at most once; loading a saved game replays nothing (the stage 6 service never re-raises).
+- `AmbientMusicPlayer`: quiet procedural pad loop (no audio files; there was no music, so Music Volume needed something real to control); follows the
+  setting live; keeps playing while paused (`ignoreListenerPause`); a real clip can be assigned later.
+- `IdleMotion`: tiny bob/swing for the placeholder miner.
+Code - CHANGED (minimal): `ThirdPersonCameraController` (orbit x Camera Sensitivity; ignores orbit input while paused), `CollectSoundPlayer` /
+`DigSoundPlayer` / `DetectorSignalIndicator` (volume x SFX Volume; indicator exposes `LastBeepVolume`), `TreasureHuntController` (DIG/COLLECT ignored
+while paused).
+Vibration: NOT added on purpose - nothing in the game vibrates yet, so a toggle would do nothing (add it together with haptic feedback).
+
+Assets / scenes:
+- NEW prefabs `Assets/Prefabs/Menus/`: `SettingsPanel` (shared), `PauseMenu` (nests SettingsPanel), `MainMenuUI` (nests SettingsPanel), `ProgressNotification`.
+  Forest green / wood brown / gold palette, Canvas + TextMeshPro, placed under `SafeAreaRoot` (Safe Area kept), root has no raycast graphic.
+- NEW scene `Assets/Scenes/MainMenu.unity`: landscape stylized mine scenery from ~17 primitive objects (ground, mountains, mine entrance with wooden frame and
+  sign, gold cart, 6 trees, 5 rocks, placeholder miner with gold helmet + pickaxe), warm light without shadows, Canvas > SafeAreaRoot > MainMenuUI, EventSystem,
+  ambient music. Materials `Assets/Materials/Menu/` (11). PLACEHOLDER art only, no colliders.
+- CHANGED `GameplayTest.unity` (additions): `PauseMenu`, `ProgressNotification` (bound to the ProgressManager), `AmbientMusic`.
+- CHANGED `ProjectSettings/EditorBuildSettings.asset`: scenes = MainMenu, GameplayTest, SampleScene (PLAY needs GameplayTest in Build Settings; a build starts at the menu).
+- CHANGED `ProjectSettings/ProjectSettings.asset`: orientation = auto-rotate LANDSCAPE only (portrait and upside-down disabled).
+Tests (all PlayMode): `SettingsPlayModeTests` (8), `MenuFlowPlayModeTests` (10), `ProgressNotificationPlayModeTests` (4), `MenuEndToEndPlayModeTests` (1);
+`ProgressTestIsolation` now also forces an in-memory settings store, resets pause/hooks.
+
+### Bug found and fixed in stage 7 (honest record)
+Opening the Settings panel overwrote the saved Camera Sensitivity: `Refresh()` changes the slider min/max, Unity clamps the value and fires `onValueChanged`,
+and the listener saved the clamped value (1.5 -> 0.25). Caught by a test (`Settings_ShowStoredValues_ApplyLive_AndArePersisted`), fixed with a `refreshing` guard,
+regression test `OpeningSettings_NeverChangesTheStoredValues`.
+
+### Test results (real, stage 7)
+- Targeted: Settings 8/8, MenuFlow 10/10, notifications 4/4, end-to-end 1/1 (the end-to-end test uses REAL scene loads: menu -> PLAY -> dig + collect the coin ->
+  PAUSE -> SETTINGS (SFX 0.3) -> RESUME -> PAUSE -> MAIN MENU -> settings persisted -> PLAY again -> coin still collected, HUD `10 / 500 GOLD`).
+- Full PlayMode suite, ONE run after all fixes: **104/104 PASSED**, Console 0 errors / 0 warnings, the user's real save file unchanged. The older intermittent Player
+  tests passed again; their cause is still NOT proven (see Known Issues).
+- Real effect checks: SFX 0.5 halves the collect and dig volume (0 = silent); Camera Sensitivity 2x / 0.5x doubles / halves the orbit (and 0 while paused);
+  Music Volume changes the music loudness live; pause freezes the player and the dig timer (frozen for longer than a whole dig, then completes after RESUME).
+- Manual Game View check with real clicks (Editor, slow flow): Main Menu, Settings (menu and pause), gameplay with the PAUSE button, pause panel, "AREA COMPLETE!" and
+  "NEW AREA UNLOCKED!" banners. Visual fixes made after the first look: title wrapped into 3 lines (now 2), band cut the miner, settings rows overlapped the sliders and
+  the track was invisible, MAIN MENU button had no contrast, banner touched its edges and overlapped the HUD header. All re-checked in screenshots.
+
+### Stage 7 limitations (not verified / open)
+- Music / SFX / beep audibility and how the procedural music sounds: NOT tested by a human. Nothing was run on a real Android device (touch on the new buttons and
+  sliders, Back key, orientation lock, PlayerPrefs, performance of the menu scene).
+- Placeholder scenery / miner / UI art (primitives and flat colours); the notification banner has no sound; no Area Selection (the Concept Document flow is Main Menu
+  -> Area Selection -> area), no Character Selection, no vibration setting.
+- Settings sliders are touch-sized for 1920x1080 reference only; not checked on small phones. Joystick while paused: the held input is ignored by the frozen game.
+
+## Stage 6 (branch `ebrar`, PR #6 open): Game progression & save system
 Goal: persistent, cumulative progress without a second gold system. The existing `TreasureHuntController.TotalGold` / HUD now read from a
 `ProgressService`; DIG -> COLLECT -> Gold Reward and the HUD are unchanged for the player.
 
@@ -282,9 +339,15 @@ Tests:
 - 2.8: "Gold treasury, ..., Area Complete feedback, and area unlocking" - treasury + unlocking done at data/logic level; offline, single player.
 - Not in this stage by decision: Main Menu, Settings, Character Selection, new maps / Area Selection, notification UI.
 
+## Concept Document v1.0 check for stage 7 (2.4 Introduction, 2.6 Atmosphere, 2.7 Game Play)
+- 2.7 "The game opens to a simple main menu" - done (Area Selection, which follows it in the document, is the next stage). Virtual joystick left / swipe right and the HUD
+  are unchanged; the new PAUSE button sits top-left and no overlay covers the touch controls during play.
+- 2.6 / 2.5 style: stylized, colourful 3D, warm earth + green + rock tones with brighter gold; calm, curious, rewarding tone; Android landscape. 2.7 "Reaching an area's
+  target displays Area Complete and New Area Unlocked" - the banners now show them. No combat / enemies / online / economy added.
+- Not in this stage by decision: Area Selection, Character Selection, final art, haptics/vibration.
+
 ## Next steps (suggested, in order)
-1. Review stage 6; commit only when the user allows it (suggested: `feat: add persistent progress, area unlocks and save system`).
-2. Notification UI for AREA COMPLETE / NEW AREA UNLOCKED, then Area Selection and Main Menu (read `ProgressService` / `ProgressManager`).
-3. Green Mine scene (Beyza) and other areas: add a `ProgressManager` + `TreasureHuntController` (`areaId`) per area and give every treasure an explicit `spotId`.
-4. Optional polish: HUD counter animation, animated progress fill, haptics, final miner model + Animator, final audio/particles (Sibel).
-5. Android build, add real scenes to Build Settings, device test (touch, audio, save/load, performance).
+1. Decide on PR #6, which now carries stages 6 and 7 together (update its description if it is merged as is).
+2. Area Selection (reads `ProgressService.IsAreaUnlocked/IsAreaCompleted`, `AreaCatalog`) between the Main Menu and gameplay; then Green Mine scene (Beyza) and other areas.
+3. Real-device check on Android: touch on buttons/sliders, Back key, landscape lock, audio levels, save/load, performance.
+4. Optional polish: vibration setting together with haptic feedback, final art/models/music/SFX (Sibel), notification sound.
