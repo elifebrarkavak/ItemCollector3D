@@ -43,6 +43,7 @@ namespace ItemCollector3D.Treasure
 
         private void Awake()
         {
+            EnsureVisual();
             ApplyVisual();
         }
 
@@ -50,7 +51,24 @@ namespace ItemCollector3D.Treasure
         {
             definition = newDefinition;
             visualRoot = newVisualRoot;
+            EnsureVisual();
             ApplyVisual();
+        }
+
+        /// <summary>
+        /// A spot without its own visual builds one from the definition's model prefab, so a treasure type
+        /// can be placed from data alone. Spots with a visual of their own (e.g. the Gold Coin prefab) are untouched.
+        /// </summary>
+        private void EnsureVisual()
+        {
+            if (visualRoot != null || definition == null || definition.ModelPrefab == null)
+            {
+                return;
+            }
+
+            GameObject model = Instantiate(definition.ModelPrefab, transform);
+            model.name = definition.ModelPrefab.name;
+            visualRoot = model;
         }
 
         /// <summary>Horizontal (XZ) distance, so the player's height does not matter.</summary>

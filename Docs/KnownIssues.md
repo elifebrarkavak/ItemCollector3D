@@ -31,3 +31,18 @@ horizontal drift is found, investigate the cause. Do not raise the 0.05 m thresh
 
 ## Other pending items
 - Not yet tested on a real Android device (touch input, Safe Area, CanvasScaler on device).
+
+## Intermittent test failure: PlayerTestScene_PlayerStaysOnGround_WhileWalkingWithKeyboard
+
+**Test:** `PlayerSystemsPlayModeTests.PlayerTestScene_PlayerStaysOnGround_WhileWalkingWithKeyboard`
+
+**Status:** Open, cause NOT proven. Test-stability problem, **not a verified gameplay bug**.
+
+**Symptom:** In one full-suite run (right after a recompile and asset creation) the "D must move the player right"
+assertion failed (moved 1.2 m, expected more than 3 m). An isolated re-run passed, and it passed in all earlier runs.
+No Player / UI / PlayerTest file had been changed.
+
+**Notes:** The test holds a key for a fixed wall-clock time (`Time.time`) and measures distance, so a slow or hitching
+Editor can shorten the effective movement time. That is a guess, not a finding. If it recurs, log player position per
+frame during the D phase to see whether the key state or the frame rate is the cause. Do not raise the 3 m threshold
+just to make the test pass.

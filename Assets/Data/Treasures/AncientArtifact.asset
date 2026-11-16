@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d32046dfb77d4c3dadfbf36b799fc73, type: 3}
+  m_Name: AncientArtifact
+  m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Treasure.TreasureDefinition
+  id: ancient_artifact
+  displayName: Ancient Artifact
+  rarity: 3
+  goldValue: 100
+  modelPrefab: {fileID: 7391856144102991593, guid: a9061977ac9884aaa88867d48d3866b1, type: 3}
+  feedbackProfile: {fileID: 11400000, guid: 36008c0ebe2234cd2a29d38f0c2e9b83, type: 2}
+  detectionRadius: 15
+  digRadius: 2.5
+  collectRadius: 3

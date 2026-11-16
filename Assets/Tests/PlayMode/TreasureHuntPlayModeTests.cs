@@ -292,6 +292,64 @@ namespace ItemCollector3D.Tests.PlayMode
 #endif
         }
 
+        [UnityTest]
+        public IEnumerator GameplayTestScene_AllFourTreasureTypes_UseSameLoop_GoldAccumulates_NoDoubleCollect()
+        {
+#if UNITY_EDITOR
+            AsyncOperation load = EditorSceneManager.LoadSceneAsyncInPlayMode(
+                GameplayScenePath, new LoadSceneParameters(LoadSceneMode.Additive));
+            yield return load;
+            loadedScene = SceneManager.GetSceneByPath(GameplayScenePath);
+            SceneManager.SetActiveScene(loadedScene);
+            yield return null;
+
+            TreasureHuntController hunt = Object.FindAnyObjectByType<TreasureHuntController>();
+            TMP_Text goldText = GameObject.Find("GoldText").GetComponent<TMP_Text>();
+            Transform player = GameObject.Find("Player").transform;
+            Button digButton = FindButton("DigButton");
+            Button collectButton = FindButton("CollectButton");
+
+            // Gold Coin already lives in the scene; spawn the other three from their prefabs, far from each other.
+            var spots = new System.Collections.Generic.List<(TreasureSpot spot, int expectedTotal, TreasureRarity rarity)>
+            {
+                (Object.FindAnyObjectByType<TreasureSpot>(), 10, TreasureRarity.Common),
+                (Spawn("Treasure_GoldNugget", new Vector3(-30f, 0f, 10f)), 35, TreasureRarity.Uncommon),
+                (Spawn("Treasure_GoldBar", new Vector3(-30f, 0f, 40f)), 85, TreasureRarity.Rare),
+                (Spawn("Treasure_AncientArtifact", new Vector3(30f, 0f, 10f)), 185, TreasureRarity.Epic)
+            };
+            yield return null;
+
+            foreach ((TreasureSpot spot, int expectedTotal, TreasureRarity rarity) in spots)
+            {
+                Assert.That(spot.Definition.Rarity, Is.EqualTo(rarity));
+                Teleport(player, spot.transform.position + new Vector3(0f, 1.1f, -1f));
+                yield return null;
+                yield return null;
+
+                Assert.That(digButton.gameObject.activeSelf, Is.True, $"DIG must show for {spot.Definition.DisplayName}.");
+                digButton.onClick.Invoke();
+                yield return null;
+                Assert.That(spot.State, Is.EqualTo(TreasureState.Revealed));
+                Assert.That(collectButton.gameObject.activeSelf, Is.True);
+
+                collectButton.onClick.Invoke();
+                yield return null;
+                Assert.That(spot.State, Is.EqualTo(TreasureState.Collected));
+                Assert.That(hunt.TotalGold, Is.EqualTo(expectedTotal), $"Gold after {spot.Definition.DisplayName}.");
+                Assert.That(goldText.text, Is.EqualTo($"{expectedTotal} / 500 GOLD"));
+
+                // Second attempts add nothing.
+                collectButton.onClick.Invoke();
+                digButton.onClick.Invoke();
+                yield return null;
+                Assert.That(hunt.TotalGold, Is.EqualTo(expectedTotal), $"{spot.Definition.DisplayName} must not be collectable twice.");
+            }
+#else
+            Assert.Ignore("Scene based test is Editor only.");
+            yield break;
+#endif
+        }
+
 #if UNITY_EDITOR
         private Button FindButton(string name)
         {
@@ -305,6 +363,15 @@ namespace ItemCollector3D.Tests.PlayMode
 
             Assert.Fail("Button not found in GameplayTest: " + name);
             return null;
+        }
+
+        private TreasureSpot Spawn(string prefabName, Vector3 position)
+        {
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Treasure/" + prefabName + ".prefab");
+            Assert.That(prefab, Is.Not.Null, "Missing prefab " + prefabName);
+            GameObject instance = Object.Instantiate(prefab, position, Quaternion.identity);
+            SceneManager.MoveGameObjectToScene(instance, loadedScene);
+            return instance.GetComponent<TreasureSpot>();
         }
 
         private static void Teleport(Transform player, Vector3 position)
