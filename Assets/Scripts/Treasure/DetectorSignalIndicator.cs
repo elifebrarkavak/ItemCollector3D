@@ -19,10 +19,27 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private Color idleColor = new(0.35f, 0.35f, 0.35f, 0.8f);
         [SerializeField] private Color flashColor = new(1f, 0.85f, 0.1f, 1f);
 
+        [Header("Signal strength by proximity (Concept Document 2.7: weak far, stronger mid, strongest close)")]
+        [Tooltip("Pulse strength at the edge of detection range (proximity 0). Strength grows to 1 when very close.")]
+        [SerializeField, Range(0.05f, 1f)] private float weakestStrength = 0.35f;
+        [Tooltip("Dot scale at full strength while it flashes (1 = no scale pulse).")]
+        [SerializeField, Min(1f)] private float maxPulseScale = 1.6f;
+        [SerializeField, Range(0f, 1f)] private float weakestBeepVolume = 0.3f;
+        [SerializeField, Range(0f, 1f)] private float strongestBeepVolume = 0.7f;
+
         private float flashTimer;
+        private float flashStrength;
         private AudioClip beep;
 
         public int PulseCount { get; private set; }
+
+        /// <summary>Strength (0..1) of the most recent pulse: weak far away, strong when close.</summary>
+        public float LastPulseStrength { get; private set; }
+
+        public static float StrengthFor(float proximity, float weakest)
+        {
+            return Mathf.Lerp(Mathf.Clamp01(weakest), 1f, Mathf.Clamp01(proximity));
+        }
 
         private void Awake()
         {
@@ -59,7 +76,9 @@ namespace ItemCollector3D.Treasure
             if (flashGraphic != null)
             {
                 float t = flashDuration > 0f ? Mathf.Clamp01(flashTimer / flashDuration) : 0f;
-                flashGraphic.color = Color.Lerp(idleColor, flashColor, t);
+                float amount = t * flashStrength;
+                flashGraphic.color = Color.Lerp(idleColor, flashColor, amount);
+                flashGraphic.rectTransform.localScale = Vector3.one * (1f + (maxPulseScale - 1f) * amount);
             }
 
             if (label != null && detector != null)
@@ -74,11 +93,13 @@ namespace ItemCollector3D.Treasure
         {
             PulseCount++;
             flashTimer = flashDuration;
+            flashStrength = StrengthFor(proximity, weakestStrength);
+            LastPulseStrength = flashStrength;
 
             if (audioSource != null && beep != null)
             {
                 audioSource.pitch = Mathf.Lerp(0.8f, 1.6f, proximity);
-                audioSource.PlayOneShot(beep, 0.5f);
+                audioSource.PlayOneShot(beep, Mathf.Lerp(weakestBeepVolume, strongestBeepVolume, flashStrength));
             }
         }
 

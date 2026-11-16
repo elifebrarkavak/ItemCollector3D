@@ -17,13 +17,22 @@ namespace ItemCollector3D.Treasure
         [Tooltip("0 = subtle, 1 = strongest (mobile-friendly) feedback. Used by later effect stages.")]
         [SerializeField, Range(0f, 1f)] private float effectIntensity = 0.25f;
 
-        [Header("Optional assets (none assigned yet - supplied by the effects stage)")]
+        [Tooltip("0 = no glow flash on collect, 1 = strongest short glow. Rare / Epic use it.")]
+        [SerializeField, Range(0f, 1f)] private float glow;
+        [Tooltip("Collect sound pitch multiplier. Higher = brighter sound for rarer treasure.")]
+        [SerializeField, Range(0.5f, 2f)] private float soundPitch = 1f;
+
+        [Header("Optional overrides (empty = built-in placeholder effects are used)")]
+        [Tooltip("Replaces the procedural placeholder chime. Final audio can be dropped in here.")]
         [SerializeField] private AudioClip collectSound;
+        [Tooltip("Replaces the placeholder particle burst. Final particles can be dropped in here.")]
         [SerializeField] private GameObject collectParticlesPrefab;
 
         public string Announcement => announcement;
         public Color AccentColor => accentColor;
         public float EffectIntensity => effectIntensity;
+        public float Glow => glow;
+        public float SoundPitch => soundPitch;
         public AudioClip CollectSound => collectSound;
         public GameObject CollectParticlesPrefab => collectParticlesPrefab;
 
