@@ -37,8 +37,12 @@
 # Visual Studio cache directory
 .vs/
 
-# Visual Studio Code workspace settings (personal/editor-specific)
-.vscode/
+# Visual Studio Code: personal / Unity-generated settings stay local (settings.json lists excluded files per machine).
+# The shared team files are kept: extensions.json (recommends Visual Studio Tools for Unity) and launch.json (Attach to Unity).
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+*.code-workspace
 
 # Gradle cache directory
 .gradle/
@@ -111,5 +115,61 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 
-# Local design-review screenshots (kept on disk, not pushed)
-Docs/UiScreenshots/
+# ---- Entries from the current github/gitignore Unity.gitignore that were missing here ----
+.vsconfig
+.dirstamp
+tmpinst-dir.stamp
+/*_BackUpThisFolder_ButDontShipItWithYourGame/
+/*_BurstDebugInformation_DoNotShip/
+*.obb
+/[Aa]ssets/**/*.blend1
+/[Aa]ssets/**/*.blend1.meta
+/[Aa]ssets/**/TDImportCache/
+/[Aa]ssets/**/TDImportCache.meta
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+/[Aa]ssets/AddressableAssetsData/*/addressables_content_state.bin
+/[Aa]ssets/AddressableAssetsData/*/addressables_content_state.bin.meta
+/[Aa]ssets/AddressableAssetsData/link.xml
+/[Aa]ssets/AddressableAssetsData/link.xml.meta
+/[Aa]ssets/Addressables_Temp/
+/[Aa]ssets/Addressables_Temp.meta
+/[Aa]ssets/StreamingAssets/aa/
+/[Aa]ssets/StreamingAssets/aa.meta
+/ServerData/
+/[Aa]ssets/GeneratedLocalRepo/
+/[Aa]ssets/GeneratedLocalRepo.meta
+/[Aa]ssets/Plugins/Android/**/*.gradle.backup*
+/[Aa]ssets/Plugins/Android/**/local.properties
+/[Aa]ssets/Resources/PerformanceTestRunInfo.json
+/[Aa]ssets/Resources/PerformanceTestRunInfo.json.meta
+/[Aa]ssets/Resources/PerformanceTestRunSettings.json
+/[Aa]ssets/Resources/PerformanceTestRunSettings.json.meta
+/[Aa]ssets/InitTestScene*.unity
+/[Aa]ssets/InitTestScene*.unity.meta
+
+# ---- Test runner output written into the project root ----
+/TestResults*.xml
+/test-results*.xml
+
+# ---- macOS / Windows temporary files ----
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---- Other editor caches / swap files ----
+.idea/
+.fleet/
+*.swp
+*~
+
+# ---- Local-only documentation (AI hand-off notes, known issues, design-review screenshots) ----
+/Docs/
