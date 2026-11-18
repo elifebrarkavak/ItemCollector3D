@@ -169,6 +169,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        [RealisticFrameRate]
         public IEnumerator GameplayTestScene_WalkWithWasdToTreasure_StaysGrounded_CameraFollows_SignalSpeedsUp()
         {
 #if UNITY_EDITOR

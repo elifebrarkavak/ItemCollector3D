@@ -365,6 +365,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        [RealisticFrameRate]
         public IEnumerator PlayerTestScene_PlayerStaysOnGround_WhileWalkingWithKeyboard()
         {
 #if UNITY_EDITOR
@@ -416,6 +417,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        [RealisticFrameRate]
         public IEnumerator PlayerTestScene_GroundCoversLongWalk_AndCameraFollowsPlayer()
         {
 #if UNITY_EDITOR

@@ -33,6 +33,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
         private Scene loadedScene;
         private MemoryCharacterStore characterStore;
+        private TestGameView gameView;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -50,6 +51,12 @@ namespace ItemCollector3D.Tests.PlayMode
         {
             GamePause.Resume();
             SceneNavigator.LoadHook = null;
+            if (gameView != null)
+            {
+                yield return gameView.Restore(); // also when an assertion failed in the test
+                gameView = null;
+            }
+
             if (loadedScene.IsValid() && loadedScene.isLoaded)
             {
                 yield return SceneManager.UnloadSceneAsync(loadedScene);
@@ -275,6 +282,20 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(title.yMin, Is.GreaterThan(play.yMax), "the title sits above the buttons");
         }
 
+        /// <summary>
+        /// The phones the game targets (landscape only): 16:9 is the design reference, the others are the wider phones. The canvas scaler matches
+        /// width and height equally (0.5), so on a wider screen the canvas gets SHORTER in reference units and a fixed-size panel takes a larger share of it.
+        /// </summary>
+        private static readonly (string name, int width, int height)[] TargetScreens =
+        {
+            ("16:9", 1920, 1080), ("18:9", 2160, 1080), ("19.5:9", 2340, 1080), ("20:9", 2400, 1080), ("21:9", 2520, 1080),
+        };
+
+        private const float ReferenceAspect = 16f / 9f;
+
+        /// <summary>The panel, its title banner and the close button must keep at least this share of the screen height free at every edge.</summary>
+        private const float ScreenEdgeMarginShare = 0.03f;
+
         [UnityTest]
         public IEnumerator Settings_IsLarge_RowsAreEvenlySpacedAndAligned_AndControlsFitFingers()
         {
@@ -285,11 +306,55 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return null;
             yield return new WaitForSecondsRealtime(0.5f); // let the pop animation finish
 
+            // Measured on every target screen with the Game View really set to that resolution (not on whatever size it happens to have:
+            // batch mode has no Game View and a 4:3 Screen, the open Editor a free-aspect one). Everything is restored afterwards.
+            gameView = new TestGameView(); // restored by TearDown
+            foreach ((string name, int width, int height) screen in TargetScreens)
+            {
+                gameView.SetResolution(screen.width, screen.height);
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                Assert.That(new Vector2Int(Screen.width, Screen.height), Is.EqualTo(new Vector2Int(screen.width, screen.height)),
+                    $"the Game View did not switch to {screen.name} ({screen.width}x{screen.height}); the layout check would measure the wrong screen");
+
+                try
+                {
+                    AssertSettingsLayout(panel);
+                }
+                catch (AssertionException e)
+                {
+                    throw new AssertionException($"On the {screen.name} screen ({screen.width}x{screen.height}): {e.Message}", e);
+                }
+            }
+        }
+
+        private void AssertSettingsLayout(SettingsPanelController panel)
+        {
             Rect canvas = CanvasRect((RectTransform)panel.GetComponentInParent<Canvas>().rootCanvas.transform);
-            Rect window = CanvasRect(Find<RectTransform>("Window"));
+            Transform windowTransform = panel.transform.Find("Window");
+            Assert.That(windowTransform, Is.Not.Null, "the settings panel has a Window");
+            Rect window = CanvasRect((RectTransform)windowTransform);
+
+            // The "about 60-70% of the screen height" rule (60-75% allowed) is defined at the 16:9 reference. The window is a fixed size in canvas units, so
+            // on a wider screen it covers sqrt(aspect / 16:9) more of the shorter canvas: the upper bound scales with that, the lower bound never drops.
             float share = window.height / canvas.height;
-            Assert.That(share, Is.InRange(0.6f, 0.75f), "the panel covers about 60-70% of the screen height");
+            float widerScreenFactor = Mathf.Sqrt(canvas.width / canvas.height / ReferenceAspect);
+            Assert.That(share, Is.InRange(0.6f, 0.75f * widerScreenFactor), "the panel covers about 60-70% of a 16:9 screen height (more on wider screens, never less)");
             Assert.That(window.width / canvas.width, Is.InRange(0.5f, 0.8f));
+
+            // nothing is cut off: the window, the banner that overhangs its top edge and the close button that overhangs its corner stay on screen
+            float margin = canvas.height * ScreenEdgeMarginShare;
+            var onScreen = Rect.MinMaxRect(canvas.xMin + margin, canvas.yMin + margin, canvas.xMax - margin, canvas.yMax - margin);
+            foreach (string partName in new[] { "TitleBanner", "CloseButton", "BackButton" })
+            {
+                Transform part = windowTransform.Find(partName);
+                Assert.That(part, Is.Not.Null, partName + " is part of the settings window");
+                Rect partRect = CanvasRect((RectTransform)part);
+                Assert.That(onScreen.Contains(partRect.min) && onScreen.Contains(partRect.max), Is.True, $"{partName} stays on screen with a margin");
+            }
+
+            Assert.That(onScreen.Contains(window.min) && onScreen.Contains(window.max), Is.True, "the window stays on screen with a margin");
 
             var rows = new List<Rect>();
             var sliderRects = new List<Rect>();

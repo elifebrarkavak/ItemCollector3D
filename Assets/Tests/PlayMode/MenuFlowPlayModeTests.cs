@@ -243,6 +243,7 @@ namespace ItemCollector3D.Tests.PlayMode
         // ------------------------------------------------------------------ Pause
 
         [UnityTest]
+        [RealisticFrameRate]
         public IEnumerator Pause_FreezesGameplay_SettingsWork_ResumeRestores()
         {
             yield return LoadScene(GameplayPath);
