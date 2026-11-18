@@ -13,7 +13,7 @@ namespace ItemCollector3D.EditorTools
     public static class UiFonts
     {
         public const string Folder = "Assets/UI/Fonts";
-        private const string SourceFontPath = "Assets/TextMesh Pro/Examples & Extras/Fonts/Bangers.ttf";
+        private const string SourceFontPath = Folder + "/Bangers.ttf"; // SIL OFL licence next to it: "Bangers - OFL.txt"
         private const string FontPath = Folder + "/IC3D Bangers SDF.asset";
 
         // Printable ASCII plus a few typographic characters: baked into the asset so the UI never depends on runtime glyph generation.
@@ -21,8 +21,7 @@ namespace ItemCollector3D.EditorTools
             " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u2019\u00D7\u2713";
 
         /// <summary>
-        /// The UI font: our OWN dynamic TMP font asset made from the Bangers .ttf with all ASCII glyphs pre-baked. (The sample
-        /// "Bangers SDF" asset of the TextMesh Pro examples is a dynamic cache that Unity rewrites on every run; it must stay untouched.)
+        /// The UI font: our OWN dynamic TMP font asset made from the Bangers .ttf (Assets/UI/Fonts) with all ASCII glyphs pre-baked.
         /// </summary>
         public static TMP_FontAsset Font
         {
