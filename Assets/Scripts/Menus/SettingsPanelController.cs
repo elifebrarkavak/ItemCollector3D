@@ -19,6 +19,7 @@ namespace ItemCollector3D.Menus
         [SerializeField] private TMP_Text sfxValueLabel;
         [SerializeField] private TMP_Text cameraValueLabel;
         [SerializeField] private Button backButton;
+        [SerializeField] private Button closeButton;
 
         private bool listenersAdded;
         private bool refreshing; // changing a slider's min/max clamps its value and fires onValueChanged: ignore that
@@ -120,6 +121,11 @@ namespace ItemCollector3D.Menus
             if (backButton != null)
             {
                 backButton.onClick.AddListener(Close);
+            }
+
+            if (closeButton != null)
+            {
+                closeButton.onClick.AddListener(Close);
             }
         }
 

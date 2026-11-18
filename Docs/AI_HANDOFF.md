@@ -8,14 +8,46 @@ Rules for whichever agent picks this up:
 4. No long test-repeat loops. One quick run is enough. Never write PASS for a test you did not run.
 5. No new packages without asking. Update this file when you finish or stop (even if the task is half done).
 
-## Current state (2026-11-16)
+## Current state (2026-11-18)
+- **UI redesign (stage 8) is implemented in the working tree of branch `ebrar` and is NOT committed / pushed** (waiting for the user's approval, see the stage 8
+  section below). Last agent: Claude Code; Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
 - Branch: `ebrar`. Stage 6 (persistent progression, commit `f071a90`) and stage 7 (game menus, commit `feat: add main menu settings pause and notifications`; hash: see
   `git log`) are both COMMITTED and PUSHED to `origin/ebrar`. NOTE: PR #6 (stage 6) uses `ebrar` as its head branch, so it now also contains the stage 7 commit
   (its description was written for stage 6 only and was not edited). PR #6 is still OPEN and NOT merged. Stage 7 reads the stage 6 `ProgressManager` events.
-- Last agent: Claude Code. Unity Editor left with Play Mode off and `GameplayTest` open, not dirty.
 - **Manual-testing notes:** the game saves to a REAL file (`~/Library/Application Support/DefaultCompany/ItemCollector3DStaging/item_collector_progress.json`,
   see stage 6) and settings go to the Editor's PlayerPrefs. Automated tests use in-memory stores for both and never touch them. The user's own save
   (totalGold 10, coin collected) was backed up and restored byte for byte around my manual visual runs.
+
+## Stage 8 (branch `ebrar`, UNCOMMITTED): mobile UI redesign + Character Selection
+Goal: a cohesive, cute mobile UI (Concept Document palette: cave navy #1D293B, wood #704630, gold #F2B83F, green #37856B, cream #FFF0D3) for Main Menu, Settings, Pause and a new
+Character Selection. Nothing of Save / Progress / Treasure / HUD / gameplay / Area Selection was touched. No new packages.
+- **Design system** (all generated from code, reproducible: menu `Assets/Editor/UiBuild/*`, entry points `UiSpriteFactory.BuildAll`, `UiFonts.BuildAll`,
+  `CharacterBuilder.BuildAll` + `IntegratePlayer`, `MenuUiBuilder.BuildAll`, `MenuSceneBuilder.Build`): chunky 9-sliced buttons (gold / wood / green / navy), wood panel,
+  navy banner, gold sliders, icons (`Assets/UI/Sprites/Generated`), text styles = our own font asset `Assets/UI/Fonts/IC3D Bangers SDF.asset` (from `Bangers.ttf`, ASCII pre-baked, kept in builds) with outline/shadow
+  material presets (`Assets/UI/Fonts`). Never point UI text at the sample `Bangers SDF.asset`: it is an empty dynamic cache and rendered grey blocks when reverted. Runtime helpers: `UiButtonFeedback` (press squash + label sink, PLAY idle pulse), `UiEntrance` (slide / pop on enable, unscaled time),
+  `ScreenFader` (0.4 s fade-in of every scene, created by code).
+- **Main Menu** (`MainMenu.unity`, `MainMenuUI.prefab`): title + "3D" badge on top, left column PLAY (big gold) / CHARACTER / SETTINGS / EXIT, 3D miner preview on the right
+  (`MenuCharacterStage`, placed from viewport coordinates so it works on every 16:9+ screen), procedural low-poly gold-mine scenery with glow, dust, bloom.
+- **Settings** (`SettingsPanel.prefab`, same shared prefab in Main Menu and Pause): 1300x740 wood panel (~68% of the screen), SETTINGS banner, X, 3 rows (icon + name,
+  gold slider, value), BACK. `SettingsPanelController` got an optional `closeButton`; the PlayerPrefs saving is unchanged.
+- **Pause** (`PauseMenu.prefab`): round PAUSE button (top right), dimmed game behind, PAUSED panel with RESUME (gold) / SETTINGS / MAIN MENU, shared settings panel.
+- **Character Selection**: `CharacterCatalog` (asset `Assets/Data/Characters/CharacterCatalog.asset`, ids `barnaby`, `ruby`), `CharacterSelection` (PlayerPrefs key
+  `ic3d.character.selected`, store interface for tests), `CharacterSelectController`, `PlayerCharacterVisual` (added to `Player.prefab`: spawns the chosen model under the
+  existing `Visual` child, hides the capsule renderer; the controller, CharacterController, camera and dig system are untouched), `MinerAnimator` (procedural idle / walk).
+- **Miner models are TEMPORARY placeholders** (primitives + generated hemisphere/arc meshes, `Assets/Prefabs/Characters`): orange-bearded man and red-braided girl with yellow
+  hard hat + head lamp, same rig and same abilities. They are not final art. Requirements for real models are in `Docs/KnownIssues.md` ("Stage 8 missing assets").
+- **Mobile rules checked:** Canvas Scaler = Scale With Screen Size, 1920x1080, match 0.5 (unchanged); all touch targets >= 120 reference units (~46-48 dp), asserted in tests;
+  safe area: all menus live inside the existing `SafeAreaRoot`, only the dim / vignette overlays bleed out on purpose.
+- **Tests (real runs, this session):** new `CharacterAndUiPlayModeTests` 10/10; whole PlayMode suite **114/114 passed**, Console 0 errors / 0 warnings after the run.
+  Existing tests changed because the design changed: `MenuFlowPlayModeTests.MainMenu_HasLightScenery_AndCorrectButtons` -> `MainMenu_HasCaveScenery_MinerStage_AndCorrectButtons`
+  (no more `PlaceholderMiner`, checks the miner stage and the new CHARACTER button); both menu test classes now use an in-memory `CharacterSelection` store.
+- Verified in the real Game View (Editor): screenshots in `Docs/UiScreenshots` (local only: git-ignored, not on GitHub), real simulated pointer clicks for CHARACTER, arrows, SELECT, PLAY, PAUSE, SETTINGS, BACK/X,
+  RESUME, MAIN MENU and a slider click. Aspect ratios checked: 16:9, 18:9, 20:9 (2400x1080), 21:9 (2560x1080) and 1280x720.
+- **Final check (2026-11-18):** after a REAL Unity restart the font atlas was intact (97 glyphs, 413k non-empty pixels, file byte-identical); all menu TMP texts use the IC3D font, atlas and have every glyph
+  (HUD texts still use the default Liberation Sans on purpose: HUD was out of scope). Menu button column moved 28 units up so EXIT keeps a margin on 21:9. Full PlayMode suite 114/114 again, Console 0 errors / 0 warnings.
+- Not verified: a real Android device (touch feel, performance, bloom cost, safe area with a real notch), audio, the look on small phones.
+- Tooling tip: the running Editor can be driven with `~/.unity/bin/unity command ...` (script eval, capture game_view, runtime simulate_pointer, test run --async-tests).
+  Real UI clicks only arrive when the Editor app AND the Game View window are focused (`unity command editor focus` + `EditorWindow.FocusWindowIfItsOpen(GameView)`).
 
 ## Stage 7 (branch `ebrar`, pushed; inside PR #6): Game menus - Main Menu, Settings, Pause, progress notifications
 Flow: Main Menu -> PLAY -> GameplayTest -> PAUSE -> SETTINGS -> RESUME -> PAUSE -> MAIN MENU. No Area Selection / Character Selection (later stages).

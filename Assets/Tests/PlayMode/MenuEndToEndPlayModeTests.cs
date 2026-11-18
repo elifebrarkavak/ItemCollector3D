@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections;
+using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
 using ItemCollector3D.Progress;
 using ItemCollector3D.Treasure;
@@ -41,6 +42,8 @@ namespace ItemCollector3D.Tests.PlayMode
             ProgressManager.StoreFactoryOverride = () => new MemoryProgressStore();
             GameSettings.StoreFactoryOverride = () => new MemorySettingsStore();
             GameSettings.ResetCurrent();
+            CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore();
+            CharacterSelection.ResetCurrent();
         }
 
         private static T Find<T>(string name) where T : Component
@@ -89,6 +92,8 @@ namespace ItemCollector3D.Tests.PlayMode
             ProgressManager.StoreFactoryOverride = () => progressStore; // survives "restarting" the scenes
             GameSettings.StoreFactoryOverride = () => settingsStore;
             GameSettings.ResetCurrent();
+            CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore();
+            CharacterSelection.ResetCurrent();
 
             // ---- Main Menu
             yield return EditorSceneManager.LoadSceneAsyncInPlayMode(MainMenuPath, new LoadSceneParameters(LoadSceneMode.Single));

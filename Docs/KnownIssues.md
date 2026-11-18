@@ -172,3 +172,22 @@ lockout on COLLECT after the reveal, or separate button positions. Neither is im
 - **Bug found and fixed in this stage (kept for the record):** opening Settings used to overwrite the saved Camera Sensitivity (slider min/max clamp fired onValueChanged);
   fixed with a refresh guard and a regression test.
 
+
+
+## Stage 8 missing assets / placeholders (UI redesign)
+
+The UI is complete and consistent, but these pieces are still **placeholders**, not final production art:
+
+1. **Miner models (most important).** `Barnaby` (orange-bearded miner) and `Ruby` (red-braided miner girl) are built from primitives and two generated meshes. For real models provide, per
+   character: one skinned mesh (about 5-12k triangles), feet at y = 0, about 2 m tall including the hard hat, facing +Z, one material atlas or <= 3 materials (URP Lit / mobile friendly),
+   a yellow hard hat with an emissive head-lamp lens, same skeleton for both, and the clips Idle, Walk/Run and Dig (the existing `PlayerDigAnimator` can drive an `Animator` trigger named `Dig`).
+   Integration is a prefab swap in `CharacterCatalog` (no code change): `PlayerCharacterVisual` and `MenuCharacterStage` instantiate whatever prefab the catalog lists. Remove / replace
+   `MinerAnimator` if an `Animator` is used. The Concept Document logo art itself was not available to the generator; the characters follow its textual description.
+2. **Logo.** The title is text (Bangers + outline) with a "3D" badge and gem icons, not the Concept Document logo artwork. A real logo PNG can replace `TitleRoot/Title` in `MainMenuUI.prefab`.
+3. **Font.** Bangers is a comic font that is readable but not very round. A rounded display font (e.g. Fredoka / Lilita One, SIL OFL) would match "round and bold" better; the text
+   materials in `Assets/UI/Fonts` only need a new font asset. The UI uses its OWN font asset `Assets/UI/Fonts/IC3D Bangers SDF.asset` (made from `Bangers.ttf`, all ASCII glyphs pre-baked).
+   Do NOT use the sample `Bangers SDF.asset` of the TextMesh Pro examples for the UI: it is an empty dynamic cache that Unity rewrites on every run (reverting it with git empties its
+   atlas, and any material pointing at it then renders grey blocks instead of text - this happened once during this work and was fixed by switching to the own asset).
+4. **Environment art.** The mine is generated low-poly geometry (flat shaded rocks, crystals, rails, cart, lanterns). Real modelled props / a painted backdrop would raise the quality.
+5. **Audio.** No UI click / transition sounds; music is still the procedural pad from stage 7.
+6. **Device checks.** Not tested on a real Android phone: bloom + a realtime shadow in the menu scene should be profiled on a low-end device (Quality / `Mobile_RPAsset`).

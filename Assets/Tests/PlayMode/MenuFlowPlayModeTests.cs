@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.Collections;
+using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
 using ItemCollector3D.Player;
 using ItemCollector3D.Treasure;
@@ -32,6 +33,8 @@ namespace ItemCollector3D.Tests.PlayMode
         public IEnumerator SetUp()
         {
             GameSettings.ResetCurrent();
+            CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore(); // never touch the real PlayerPrefs
+            CharacterSelection.ResetCurrent();
             previousBackground = InputSystem.settings.backgroundBehavior;
             previousEditorBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
             InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
@@ -59,6 +62,8 @@ namespace ItemCollector3D.Tests.PlayMode
             loadedScene = default;
             GameSettings.StoreFactoryOverride = () => new MemorySettingsStore();
             GameSettings.ResetCurrent();
+            CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore();
+            CharacterSelection.ResetCurrent();
             InputSystem.settings.backgroundBehavior = previousBackground;
             InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorBehavior;
         }
@@ -108,17 +113,19 @@ namespace ItemCollector3D.Tests.PlayMode
         // ------------------------------------------------------------------ Main Menu
 
         [UnityTest]
-        public IEnumerator MainMenu_HasLightScenery_AndCorrectButtons()
+        public IEnumerator MainMenu_HasCaveScenery_MinerStage_AndCorrectButtons()
         {
             yield return LoadScene(MainMenuPath);
             Transform scenery = Find<Transform>("Scenery");
-            Assert.That(scenery.childCount, Is.InRange(8, 40), "Light scenery: rocks, trees, mine entrance, miner.");
+            Assert.That(scenery.childCount, Is.InRange(8, 40), "Grouped cave scenery: floor, walls, mine entrance, crystals, timber, lanterns, glows.");
             Assert.That(GameObject.Find("MineEntrance"), Is.Not.Null);
-            Assert.That(GameObject.Find("PlaceholderMiner"), Is.Not.Null);
+            MenuCharacterStage stage = Object.FindAnyObjectByType<MenuCharacterStage>();
+            Assert.That(stage, Is.Not.Null, "The 3D miner preview stage is part of the menu.");
+            Assert.That(stage.ShownModel, Is.Not.Null, "A miner is shown on the right of the menu.");
             Assert.That(Camera.main, Is.Not.Null);
             Assert.That(Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>(), Is.Not.Null);
             Assert.That(Find<TMP_Text>("Title").text, Does.Contain("ITEM COLLECTOR"));
-            foreach (string label in new[] { "PlayButton", "SettingsButton", "ExitButton" })
+            foreach (string label in new[] { "PlayButton", "CharacterButton", "SettingsButton", "ExitButton" })
             {
                 Assert.That(Find<Button>(label).interactable, Is.True, label);
             }
