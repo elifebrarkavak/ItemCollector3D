@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea0662f09e58d4be3bba9ef5992ff434, type: 3}
+  m_Name: CharacterCatalog
+  m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Characters.CharacterCatalog
+  entries:
+  - id: barnaby
+    displayName: BARNABY
+    tagline: The Bearded Digger
+    prefab: {fileID: 5842841039349881472, guid: 9d598043dfb6d4a2ca0fcaeaa8325c52, type: 3}
+  - id: ruby
+    displayName: RUBY
+    tagline: The Braided Explorer
+    prefab: {fileID: 8123633118003892481, guid: 6ba6d706cf5634e25ae7db0bb4c87704, type: 3}

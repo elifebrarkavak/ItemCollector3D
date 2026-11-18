@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 203c6e3a9fac9441ead9d9c501122f52, type: 3}
+  m_Name: AreaCatalog
+  m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Progress.AreaCatalog
+  areas:
+  - id: green_mine
+    displayName: GREEN MINE
+    unlockTotalGold: 0
+    goalTotalGold: 500
+  - id: rocky_canyon
+    displayName: ROCKY CANYON
+    unlockTotalGold: 500
+    goalTotalGold: 1200
+  - id: ancient_mine
+    displayName: ANCIENT MINE
+    unlockTotalGold: 1200
+    goalTotalGold: 2500

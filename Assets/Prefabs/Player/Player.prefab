@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 9007221623158097187}
   - component: {fileID: 2907536420062697754}
   - component: {fileID: 5556187054153698321}
+  - component: {fileID: 3103320061956670675}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -97,6 +98,22 @@ MonoBehaviour:
   dipDistance: 0.18
   squash: 0.15
   strokes: 2
+--- !u!114 &3103320061956670675
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4006418391132098698}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b0d51e0dfdd14e238888b2c5cf128f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Characters.PlayerCharacterVisual
+  catalog: {fileID: 11400000, guid: f59e9be8845cc45b5ba5ca0fe664d7c7, type: 2}
+  visual: {fileID: 6305929730133013320}
+  feetOffset: -1
+  modelScale: 1
 --- !u!1 &7169706401526998476
 GameObject:
   m_ObjectHideFlags: 0

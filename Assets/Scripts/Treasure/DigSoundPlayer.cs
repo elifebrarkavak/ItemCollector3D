@@ -1,3 +1,4 @@
+using ItemCollector3D.Menus;
 using UnityEngine;
 
 namespace ItemCollector3D.Treasure
@@ -57,7 +58,7 @@ namespace ItemCollector3D.Treasure
 
             lastPlayTime = Time.unscaledTime;
             LastPitch = strokeIndex % 2 == 0 ? 1f : 0.88f; // alternate strokes sound slightly different
-            LastVolume = volume;
+            LastVolume = volume * GameSettings.SfxScale; // Settings > SFX Volume
 
             source.Stop();
             source.clip = clip;

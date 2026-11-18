@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace ItemCollector3D.Treasure
@@ -22,8 +23,22 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private TreasureDefinition definition;
         [Tooltip("Visual shown after DIG. Kept inactive while the treasure is hidden.")]
         [SerializeField] private GameObject visualRoot;
+        [Tooltip("Unique id of THIS placed treasure (saved when it is collected). Must be unique across the game. " +
+                 "Empty = a fallback id built from scene, type and position (changes if the spot is moved).")]
+        [SerializeField] private string spotId;
 
         public static IReadOnlyList<TreasureSpot> Active => ActiveSpots;
+
+        /// <summary>
+        /// Set by the hunt controller while a save is loaded: tells a spot whether its id was already collected, so a
+        /// reloaded scene (or a late-spawned spot) starts as Collected instead of paying gold again.
+        /// </summary>
+        public static Func<string, bool> AlreadyCollectedProvider;
+
+        /// <summary>The explicit id if set, otherwise a deterministic fallback (scene / type / position).</summary>
+        public string SpotId => HasExplicitId ? spotId.Trim() : BuildFallbackId();
+
+        public bool HasExplicitId => !string.IsNullOrWhiteSpace(spotId);
 
         public TreasureDefinition Definition => definition;
         public TreasureState State { get; private set; } = TreasureState.Hidden;
@@ -34,6 +49,11 @@ namespace ItemCollector3D.Treasure
         private void OnEnable()
         {
             ActiveSpots.Add(this);
+
+            if (State == TreasureState.Hidden && AlreadyCollectedProvider != null && AlreadyCollectedProvider(SpotId))
+            {
+                RestoreCollected();
+            }
         }
 
         private void OnDisable()
@@ -45,6 +65,34 @@ namespace ItemCollector3D.Treasure
         {
             EnsureVisual();
             ApplyVisual();
+        }
+
+        public void SetSpotId(string id)
+        {
+            spotId = id;
+        }
+
+        /// <summary>
+        /// Puts a treasure that was already collected in a previous session / scene load straight into the Collected state.
+        /// Silent: raises no event and gives no gold.
+        /// </summary>
+        public void RestoreCollected()
+        {
+            if (State == TreasureState.Collected)
+            {
+                return;
+            }
+
+            State = TreasureState.Collected;
+            ApplyVisual();
+        }
+
+        private string BuildFallbackId()
+        {
+            Vector3 p = transform.position;
+            string type = definition != null ? definition.Id : "treasure";
+            return string.Format(
+                CultureInfo.InvariantCulture, "{0}/{1}@{2:F1},{3:F1},{4:F1}", gameObject.scene.name, type, p.x, p.y, p.z);
         }
 
         public void Configure(TreasureDefinition newDefinition, GameObject newVisualRoot)

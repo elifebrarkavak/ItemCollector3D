@@ -1,4 +1,6 @@
 using System;
+using ItemCollector3D.Menus;
+using ItemCollector3D.Progress;
 using ItemCollector3D.UI;
 using UnityEngine;
 
@@ -16,6 +18,13 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private Transform player;
         [SerializeField] private string levelTitle = "GOLD COIN TEST";
         [SerializeField, Min(1)] private int goldTarget = 10;
+
+        [Header("Progression (optional)")]
+        [Tooltip("When set, total gold, collected treasure ids and area unlocks are persistent and cumulative across areas. " +
+                 "Without it the controller keeps a scene-local gold counter exactly as before.")]
+        [SerializeField] private ProgressManager progress;
+        [Tooltip("The area this scene belongs to (id from the AreaCatalog). Its goal is the HUD maximum; a locked area is not playable.")]
+        [SerializeField] private string areaId = "green_mine";
         [Tooltip("Seconds between pressing DIG and the treasure being revealed (Concept Document: short interactions). 0 = reveal instantly.")]
         [SerializeField, Min(0f)] private float digDuration = 0.45f;
 
@@ -26,7 +35,17 @@ namespace ItemCollector3D.Treasure
         private TreasureSpot digTarget;
         private float digElapsed;
 
-        public int TotalGold { get; private set; }
+        private int localGold;
+        private ProgressService connectedService; // kept so cleanup never depends on `progress` still being alive
+
+        /// <summary>Cumulative total gold (from the persistent progress when a ProgressManager is assigned, else scene-local).</summary>
+        public int TotalGold => progress != null && progress.Service != null ? progress.Service.TotalGold : localGold;
+
+        public string AreaId => areaId;
+
+        /// <summary>False while this scene's area is still locked (total gold below its unlock threshold).</summary>
+        public bool IsAreaAccessible => progress == null || progress.Service == null || progress.Service.IsAreaUnlocked(areaId);
+
         public float DigDuration => digDuration;
 
         /// <summary>True from DIG pressed until the treasure is revealed. A second DIG is ignored meanwhile.</summary>
@@ -55,13 +74,8 @@ namespace ItemCollector3D.Treasure
         private void Start()
         {
             Subscribe();
-
-            if (hud != null)
-            {
-                hud.SetLevelTitle(levelTitle);
-                hud.SetMaximumGold(goldTarget);
-                hud.SetGold(TotalGold);
-            }
+            ConnectProgress();
+            RefreshHudGold(true);
 
             // Force the first button refresh to apply.
             digButtonMode = -1;
@@ -72,6 +86,96 @@ namespace ItemCollector3D.Treasure
         private void OnDestroy()
         {
             Unsubscribe();
+            DisconnectProgress();
+        }
+
+        public void SetAreaId(string newAreaId)
+        {
+            areaId = newAreaId;
+            RefreshHudGold(true);
+        }
+
+        private void ConnectProgress()
+        {
+            if (progress == null)
+            {
+                return;
+            }
+
+            progress.Initialize();
+            connectedService = progress.Service;
+            connectedService.Changed += HandleProgressChanged;
+            TreasureSpot.AlreadyCollectedProvider = connectedService.IsCollected;
+
+            // Spots that were enabled before this controller started: restore the ones collected in an earlier session.
+            foreach (TreasureSpot spot in TreasureSpot.Active)
+            {
+                if (spot.State == TreasureState.Hidden && progress.Service.IsCollected(spot.SpotId))
+                {
+                    spot.RestoreCollected();
+                }
+            }
+
+            TreasureIdReport report = TreasureIdValidator.Validate(TreasureSpot.Active);
+            if (!report.IsValid)
+            {
+                ProgressLog.Warning("Duplicate treasure ids (they would share one collected flag): " + string.Join(", ", report.DuplicateIds));
+            }
+        }
+
+        private void DisconnectProgress()
+        {
+            // Unity destroys scene objects in no fixed order, so `progress` may already be gone here: use the cached service.
+            if (connectedService == null)
+            {
+                return;
+            }
+
+            connectedService.Changed -= HandleProgressChanged;
+            if (TreasureSpot.AlreadyCollectedProvider != null && TreasureSpot.AlreadyCollectedProvider.Target == connectedService)
+            {
+                TreasureSpot.AlreadyCollectedProvider = null; // never leave a stale provider for the next scene
+            }
+
+            connectedService = null;
+        }
+
+        private void HandleProgressChanged()
+        {
+            RefreshHudGold(false);
+        }
+
+        private void RefreshHudGold(bool updateTitle)
+        {
+            if (hud == null)
+            {
+                return;
+            }
+
+            int goal = goldTarget;
+            string title = levelTitle;
+            if (progress != null && progress.Service != null)
+            {
+                int areaGoal = progress.Service.GetGoal(areaId);
+                if (areaGoal > 0)
+                {
+                    goal = areaGoal;
+                }
+
+                string areaName = progress.Service.GetDisplayName(areaId);
+                if (!string.IsNullOrEmpty(areaName))
+                {
+                    title = areaName;
+                }
+            }
+
+            if (updateTitle)
+            {
+                hud.SetLevelTitle(title);
+            }
+
+            hud.SetMaximumGold(goal);
+            hud.SetGold(TotalGold);
         }
 
         private void Update()
@@ -123,9 +227,9 @@ namespace ItemCollector3D.Treasure
 
         private void HandleDigRequested()
         {
-            if (IsDigging)
+            if (IsDigging || !IsAreaAccessible || GamePause.IsPaused)
             {
-                return; // one dig at a time; the button is disabled but Invoke()/double taps must be safe too
+                return; // one dig at a time (Invoke()/double taps must be safe); a locked area cannot be played
             }
 
             TreasureSpot target = FindInRange(TreasureState.Hidden);
@@ -184,16 +288,41 @@ namespace ItemCollector3D.Treasure
 
         private void HandleCollectRequested()
         {
+            if (GamePause.IsPaused)
+            {
+                return; // gameplay is frozen while paused
+            }
+
             TreasureSpot target = FindInRange(TreasureState.Revealed);
             if (target != null && target.Collect())
             {
                 int reward = target.Definition != null ? target.Definition.GoldValue : 0;
-                TotalGold += reward;
-                hud.SetGold(TotalGold);
-                TreasureCollected?.Invoke(target, reward);
+                if (GrantGold(target, reward))
+                {
+                    hud.SetGold(TotalGold);
+                    TreasureCollected?.Invoke(target, reward);
+                }
             }
 
             RefreshButtons();
+        }
+
+        /// <returns>false if no gold was granted (the treasure id was already collected, or invalid).</returns>
+        private bool GrantGold(TreasureSpot spot, int reward)
+        {
+            if (progress == null || progress.Service == null)
+            {
+                localGold += reward;
+                return true;
+            }
+
+            RegisterResult result = progress.Service.RegisterCollected(spot.SpotId, reward);
+            if (result != RegisterResult.Accepted)
+            {
+                ProgressLog.Warning($"No gold granted for treasure '{spot.SpotId}': {result}.");
+            }
+
+            return result == RegisterResult.Accepted;
         }
 
         private void RefreshButtons()
@@ -203,8 +332,9 @@ namespace ItemCollector3D.Treasure
                 return;
             }
 
-            int digMode = IsDigging ? 2 : FindInRange(TreasureState.Hidden) != null ? 1 : 0;
-            bool canCollect = FindInRange(TreasureState.Revealed) != null;
+            bool accessible = IsAreaAccessible;
+            int digMode = !accessible ? 0 : IsDigging ? 2 : FindInRange(TreasureState.Hidden) != null ? 1 : 0;
+            bool canCollect = accessible && FindInRange(TreasureState.Revealed) != null;
 
             if (digMode != digButtonMode)
             {
