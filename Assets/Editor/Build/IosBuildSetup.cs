@@ -61,10 +61,18 @@ namespace ItemCollector3D.EditorTools
             PlayerSettings.iOS.hideHomeButton = true;
             PlayerSettings.iOS.deferSystemGesturesMode = UnityEngine.iOS.SystemGestureDeferMode.BottomEdge;
 
-            // Metal only. Keep these two calls LAST: some of the iOS setters above reset the "use default graphics APIs" flag in memory, and a later Editor save
-            // (for example when PlayMode tests run) would then write "automatic" back into ProjectSettings.asset.
+            // Metal only. Keep this LAST: some of the iOS setters above reset the "use default graphics APIs" flag in memory, and a later Editor save (for
+            // example when PlayMode tests run) would then write "automatic" back into ProjectSettings.asset.
+            // The API LIST is deliberately not set: Metal is already the list (it is iOS's default and only API in Unity 6) and PlayerSettings.SetGraphicsAPIs
+            // for iOS from this Editor logs "Trying to set empty graphics device types list for platform iOSSupport; setting default list instead" every time,
+            // because Unity filters the array down to nothing and falls back to the default list (Metal). So only the flag is set, and the list is only
+            // written if it is ever something other than exactly [Metal].
             PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.iOS, false);
-            PlayerSettings.SetGraphicsAPIs(BuildTarget.iOS, new[] { GraphicsDeviceType.Metal });
+            GraphicsDeviceType[] apis = PlayerSettings.GetGraphicsAPIs(BuildTarget.iOS);
+            if (apis.Length != 1 || apis[0] != GraphicsDeviceType.Metal)
+            {
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.iOS, new[] { GraphicsDeviceType.Metal });
+            }
 
             AssetDatabase.SaveAssets();
             return Describe();
