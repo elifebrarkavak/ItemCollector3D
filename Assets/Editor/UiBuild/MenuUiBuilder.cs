@@ -155,15 +155,15 @@ namespace ItemCollector3D.EditorTools
             {
                 ClearChildren(root.transform);
 
-                // the HUD button that opens the pause menu: a round wood button in the top-right corner
+                // the HUD button that opens the pause menu: a round wood button in the top-left corner, next to the level name plate
                 Button pauseButton = RoundButton(root.transform, "PauseButton", "ui_round_wood", "icon_pause", 132f, 70f);
-                Place(pauseButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-24f, -24f), new Vector2(132f, 132f));
+                Place(pauseButton.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(32f, -28f), new Vector2(132f, 132f));
 
                 RectTransform panel = Rect("PausePanel", root.transform);
                 Stretch(panel);
                 Dim(panel, 0.62f);
                 RectTransform window = WoodWindow(panel, new Vector2(720f, 640f));
-                window.anchoredPosition = new Vector2(0f, -50f); // sits below the HUD header (the PAUSED banner overlaps the window's top edge)
+                window.anchoredPosition = new Vector2(0f, -50f); // the PAUSED banner overlaps the window's top edge; the HUD is hidden while paused (HideWhilePaused)
                 Entrance(window.gameObject, UiEntrance.Style.Pop, 0f, 0.28f);
                 TitleBanner(window, "PAUSED", new Vector2(520f, 140f), 82f, new Vector2(0f, -4f));
 
