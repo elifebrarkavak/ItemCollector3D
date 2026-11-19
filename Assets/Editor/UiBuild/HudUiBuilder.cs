@@ -46,6 +46,8 @@ namespace ItemCollector3D.EditorTools
                 Transform controls = safeArea.Find("MobileControls");
                 var controller = hud.GetComponent<HudController>();
                 ClearChildren(hud);
+                ConfigureScaler(root.GetComponent<CanvasScaler>());
+                ConfigureSafeArea(safeArea.GetComponent<SafeAreaFitter>());
 
                 // ---- top left: level name plate, tucked under the PAUSE button (which lives in the PauseMenu prefab)
                 RectTransform plate = Rect("LevelPlate", hud);

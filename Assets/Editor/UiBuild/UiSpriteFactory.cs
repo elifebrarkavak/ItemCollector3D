@@ -35,7 +35,7 @@ namespace ItemCollector3D.EditorTools
             Save("ui_round_gold", RoundButton(128, GoldLight, Gold, GoldDark, Hex("#FFF3C4")), 0);
 
             // ------------------------------------------------ panels
-            Save("ui_panel_wood", WoodPanel(256, 256), 88);
+            Save("ui_panel_wood", WoodPanel(256, 256), 72);
             Save("ui_row_inset", RowInset(128, 128), 46);
             Save("ui_banner", Banner(256, 128), 60);
             Save("ui_badge", Badge(128, 128), 44);
@@ -87,6 +87,8 @@ namespace ItemCollector3D.EditorTools
             Save("ui_joy_knob", JoystickKnob(128), 0);
             Save("ui_bar_fill", BarFill(64, 64), 0);
             Save("ui_pill", Pill(64, 64), 22);
+            Save("ui_shade_top", Shade(8, 64, false), 0); // soft gradients: dark at the top / left, clear at the other end (stretched under menu text)
+            Save("ui_shade_left", Shade(64, 8, true), 0);
             AssetDatabase.Refresh();
         }
 
@@ -125,17 +127,18 @@ namespace ItemCollector3D.EditorTools
 
         private static Raster WoodPanel(int w, int h)
         {
+            // stage 10: a slimmer frame (the wood rim is 14 px, was 21) and a thin groove, so the panel reads lighter and the content gets more room
             var rs = new Raster(w, h);
             rs.Fill(RoundRectBox(0, 0, w, h, 52), Outline);
-            Sdf frame = RoundRectBox(5, 5, w - 5, h - 5, 47);
-            rs.Fill(frame, VerticalGradient(5, h - 5, WoodLight, Hex("#734A31")));
-            rs.Fill(Subtract(frame, Offset(frame, 0f, 3.5f)), Alpha(Hex("#D9A272"), 0.55f));
+            Sdf frame = RoundRectBox(4, 4, w - 4, h - 4, 48);
+            rs.Fill(frame, VerticalGradient(4, h - 4, WoodLight, Hex("#734A31")));
+            rs.Fill(Subtract(frame, Offset(frame, 0f, 3f)), Alpha(Hex("#D9A272"), 0.5f));
             // groove around the board
-            rs.Fill(RoundRectBox(26, 26, w - 26, h - 26, 30), WoodDeepest);
-            Sdf board = RoundRectBox(30, 30, w - 30, h - 30, 26);
-            rs.Fill(board, VerticalGradient(30, h - 30, Hex("#6E4533"), Hex("#563424")));
-            rs.Fill(Subtract(board, Offset(board, 0f, 12f)), new Color(0f, 0f, 0f, 0.22f)); // inner shadow, board looks recessed
-            rs.Fill(Subtract(Offset(board, 0f, 2f), board), Alpha(Hex("#9A6A4C"), 0.45f)); // lower lip catches light
+            rs.Fill(RoundRectBox(18, 18, w - 18, h - 18, 34), WoodDeepest);
+            Sdf board = RoundRectBox(21, 21, w - 21, h - 21, 31);
+            rs.Fill(board, VerticalGradient(21, h - 21, Hex("#6E4533"), Hex("#563424")));
+            rs.Fill(Subtract(board, Offset(board, 0f, 12f)), new Color(0f, 0f, 0f, 0.20f)); // inner shadow, board looks recessed
+            rs.Fill(Subtract(Offset(board, 0f, 2f), board), Alpha(Hex("#9A6A4C"), 0.40f)); // lower lip catches light
             return rs;
         }
 
@@ -350,6 +353,17 @@ namespace ItemCollector3D.EditorTools
                 if (t < 0.26f) { c = Color.Lerp(c, Hex("#FFF3C4"), 0.55f * (1f - t / 0.26f)); }
                 if (t > 0.86f) { c = Color.Lerp(c, GoldDeep, (t - 0.86f) / 0.14f * 0.8f); }
                 return c;
+            });
+            return rs;
+        }
+
+        private static Raster Shade(int w, int h, bool horizontal)
+        {
+            var rs = new Raster(w, h);
+            rs.FillAll((x, y) =>
+            {
+                float t = horizontal ? x / w : y / h; // 0 = the dark end (image space, y down: the top row)
+                return new Color(0.03f, 0.05f, 0.09f, Mathf.Pow(1f - Mathf.Clamp01(t), 1.6f));
             });
             return rs;
         }

@@ -25,8 +25,8 @@ namespace ItemCollector3D.Tests.PlayMode
     {
         private const string GameplayPath = "Assets/Scenes/GameplayTest.unity";
 
-        /// <summary>48 dp on a typical Android phone is about 126 reference units; same tolerance as the menu layout tests.</summary>
-        private const float MinTouchUnits = 120f;
+        /// <summary>48 dp on a typical Android phone (1080 px high, 2.625 px per dp) is 126 reference units.</summary>
+        private const float MinTouchUnits = 126f;
 
         /// <summary>Every HUD piece keeps at least this much room to the screen edge (reference units).</summary>
         private const float EdgeMargin = 16f;
@@ -36,7 +36,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
         private static readonly (string name, int width, int height)[] TargetScreens =
         {
-            ("16:9", 1920, 1080), ("18:9", 2160, 1080), ("19.5:9", 2340, 1080), ("20:9", 2400, 1080), ("21:9", 2520, 1080),
+            ("16:9", 1920, 1080), ("18:9", 2160, 1080), ("19.5:9", 2340, 1080), ("20:9", 2400, 1080), ("21:9", 2520, 1080), ("2.6:1", 2808, 1080),
         };
 
         private Scene loadedScene;

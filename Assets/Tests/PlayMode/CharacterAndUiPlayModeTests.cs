@@ -26,10 +26,10 @@ namespace ItemCollector3D.Tests.PlayMode
         private const string CatalogPath = "Assets/Data/Characters/CharacterCatalog.asset";
 
         /// <summary>
-        /// 48 dp on a typical Android phone (1080 px high, about 2.6 px per dp) is about 126 reference units of the 1920x1080 canvas
-        /// scaler; 120 keeps a small tolerance.
+        /// 48 dp on a typical Android phone (1080 px high, 2.625 px per dp) is 126 reference units of the 1920x1080 canvas scaler.
+        /// This is the real minimum (stage 10 removed the old 120 tolerance).
         /// </summary>
-        private const float MinTouchUnits = 120f;
+        private const float MinTouchUnits = 126f;
 
         private Scene loadedScene;
         private MemoryCharacterStore characterStore;
@@ -216,10 +216,10 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(characterStore.TryGetString(CharacterSelection.Key, out string stored) && stored == CharacterSelection.FemaleId, Is.True, "persisted");
             Assert.That(stage.ShownIndex, Is.EqualTo(1), "the menu now shows the chosen miner");
 
-            // reopening shows the chosen miner as equipped
+            // reopening shows the chosen miner as the selected one (SELECTED, no second "equipped" tag: see ResponsiveUiPlayModeTests)
             Find<Button>("CharacterButton").onClick.Invoke();
             Assert.That(screen.ViewingId, Is.EqualTo(CharacterSelection.FemaleId));
-            Assert.That(Find<Transform>("EquippedBadge").gameObject.activeSelf, Is.True);
+            Assert.That(Find<Button>("SelectButton").transform.Find("Label").GetComponent<TMP_Text>().text, Is.EqualTo("SELECTED"));
             yield return null;
         }
 
@@ -288,10 +288,8 @@ namespace ItemCollector3D.Tests.PlayMode
         /// </summary>
         private static readonly (string name, int width, int height)[] TargetScreens =
         {
-            ("16:9", 1920, 1080), ("18:9", 2160, 1080), ("19.5:9", 2340, 1080), ("20:9", 2400, 1080), ("21:9", 2520, 1080),
+            ("16:9", 1920, 1080), ("18:9", 2160, 1080), ("19.5:9", 2340, 1080), ("20:9", 2400, 1080), ("21:9", 2520, 1080), ("2.6:1", 2808, 1080),
         };
-
-        private const float ReferenceAspect = 16f / 9f;
 
         /// <summary>The panel, its title banner and the close button must keep at least this share of the screen height free at every edge.</summary>
         private const float ScreenEdgeMarginShare = 0.03f;
@@ -336,12 +334,12 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(windowTransform, Is.Not.Null, "the settings panel has a Window");
             Rect window = CanvasRect((RectTransform)windowTransform);
 
-            // The "about 60-70% of the screen height" rule (60-75% allowed) is defined at the 16:9 reference. The window is a fixed size in canvas units, so
-            // on a wider screen it covers sqrt(aspect / 16:9) more of the shorter canvas: the upper bound scales with that, the lower bound never drops.
+            // The "about 60-70% of the screen height" rule (60-75% allowed). The canvas scaler EXPANDS (stage 10), so the canvas is 1080 units high on
+            // every screen 16:9 or wider and the fixed-size window covers the same share of the height everywhere: no wider-screen allowance any more.
             float share = window.height / canvas.height;
-            float widerScreenFactor = Mathf.Sqrt(canvas.width / canvas.height / ReferenceAspect);
-            Assert.That(share, Is.InRange(0.6f, 0.75f * widerScreenFactor), "the panel covers about 60-70% of a 16:9 screen height (more on wider screens, never less)");
-            Assert.That(window.width / canvas.width, Is.InRange(0.5f, 0.8f));
+            Assert.That(share, Is.InRange(0.6f, 0.75f), "the panel covers about 60-70% of the screen height");
+            Assert.That(window.width, Is.EqualTo(1300f).Within(1f), "a wider screen adds space around the panel, it does not stretch it");
+            Assert.That(window.width / canvas.width, Is.LessThanOrEqualTo(0.8f));
 
             // nothing is cut off: the window, the banner that overhangs its top edge and the close button that overhangs its corner stay on screen
             float margin = canvas.height * ScreenEdgeMarginShare;
