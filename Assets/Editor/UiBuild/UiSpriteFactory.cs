@@ -75,6 +75,7 @@ namespace ItemCollector3D.EditorTools
             Save("ui_dot", Dot(48), 0);
 
             BuildHudSprites();
+            BuildAreaSprites();
             AssetDatabase.Refresh();
         }
 
@@ -89,6 +90,17 @@ namespace ItemCollector3D.EditorTools
             Save("ui_pill", Pill(64, 64), 22);
             Save("ui_shade_top", Shade(8, 64, false), 0); // soft gradients: dark at the top / left, clear at the other end (stretched under menu text)
             Save("ui_shade_left", Shade(64, 8, true), 0);
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>Sprites of the Area Selection (stage 11): the padlock of a locked area card / button. Only generates what is new, the rest of the set is untouched.</summary>
+        public static void BuildAreaSprites()
+        {
+            Directory.CreateDirectory(Folder);
+            Sdf shackle = Intersect(Ring(64, 54, 21f, 7f), (x, y) => y - 58f);
+            Sdf body = RoundRectBox(30, 54, 98, 108, 13);
+            Sdf keyhole = Union(Circle(64, 76, 8.5f), Polygon(new Vector2(59, 80), new Vector2(69, 80), new Vector2(72, 96), new Vector2(56, 96)));
+            Save("icon_lock", Icon(Subtract(Union(shackle, body), keyhole), Cream), 0);
             AssetDatabase.Refresh();
         }
 

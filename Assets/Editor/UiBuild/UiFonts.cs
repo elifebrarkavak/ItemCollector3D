@@ -54,6 +54,7 @@ namespace ItemCollector3D.EditorTools
             TMP_FontAsset font = TMP_FontAsset.CreateFontAsset(source, 90, 9, UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, 1024, 1024,
                 AtlasPopulationMode.Dynamic, false);
             font.name = "IC3D Liberation SDF";
+            DisableClearDynamicData(font);
             AssetDatabase.CreateAsset(font, BodyFontPath);
             font.material.name = "IC3D Liberation SDF Material";
             AssetDatabase.AddObjectToAsset(font.material, font);
@@ -68,6 +69,40 @@ namespace ItemCollector3D.EditorTools
             EditorUtility.SetDirty(font);
             AssetDatabase.SaveAssets();
             return font;
+        }
+
+        /// <summary>
+        /// TMP dynamic font assets default to "Clear Dynamic Data On Build" = on. TMP then wipes the glyph table whenever it cleans dynamic data and rebuilds it
+        /// from the few characters actually drawn, so the pre-baked ASCII set and the atlas change on their own (the Liberation font went from 98 baked characters
+        /// to the 52 in use). The Bangers asset has the flag off and never changed; the body font now matches it.
+        /// </summary>
+        private static void DisableClearDynamicData(TMP_FontAsset font)
+        {
+            var so = new SerializedObject(font);
+            SerializedProperty flag = so.FindProperty("m_ClearDynamicDataOnBuild");
+            if (flag != null)
+            {
+                flag.boolValue = false;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>
+        /// Repairs a body font whose glyph set was reduced by TMP: switches the clear-on-build flag off, clears the dynamic data and bakes the original set again
+        /// in the original order (printable ASCII, the typographic apostrophe and multiplication sign, then the ellipsis), so glyphs and atlas are rebuilt
+        /// exactly as committed. Returns a short summary.
+        /// </summary>
+        public static string RestoreBodyFontGlyphs()
+        {
+            TMP_FontAsset body = BodyFont;
+            DisableClearDynamicData(body);
+            body.ClearFontAssetData(false);
+            body.TryAddCharacters(BakedCharacters.Replace("\u2713", ""), out string missing); // Liberation Sans has no check mark glyph (the icon is a sprite)
+            body.TryAddCharacters("\u2026", out string missingEllipsis);
+            EditorUtility.SetDirty(body);
+            EditorUtility.SetDirty(body.atlasTexture);
+            AssetDatabase.SaveAssets();
+            return $"characters={body.characterTable.Count} glyphs={body.glyphTable.Count} missing='{missing}{missingEllipsis}' atlas={body.atlasWidth}x{body.atlasHeight}";
         }
 
         private static TMP_FontAsset CreateFont()

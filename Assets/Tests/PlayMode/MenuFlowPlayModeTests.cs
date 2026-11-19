@@ -146,7 +146,13 @@ namespace ItemCollector3D.Tests.PlayMode
             Transform buttons = Find<Transform>("Buttons");
 
             Find<Button>("PlayButton").onClick.Invoke();
-            Assert.That(requested, Is.EqualTo(SceneNavigator.GameplayScene), "PLAY opens the existing GameplayTest scene.");
+            Assert.That(requested, Is.Null, "PLAY opens the Area Selection: it no longer loads the gameplay scene directly.");
+            Assert.That(menu.IsAreaSelectOpen, Is.True);
+            Find<Button>("AreaPlay_green_mine").onClick.Invoke();
+            Assert.That(requested, Is.EqualTo(SceneNavigator.GameplayScene), "GREEN MINE (the only open area) opens the existing GameplayTest scene.");
+            Find<Button>("AreaBackButton").onClick.Invoke();
+            Assert.That(menu.IsAreaSelectOpen, Is.False);
+            Assert.That(buttons.gameObject.activeSelf, Is.True, "BACK returns to the Main Menu buttons.");
 
             Find<Button>("SettingsButton").onClick.Invoke();
             Assert.That(menu.IsSettingsOpen, Is.True);

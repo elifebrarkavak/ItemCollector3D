@@ -11,8 +11,8 @@ using UnityEditor;
 namespace ItemCollector3D.Menus
 {
     /// <summary>
-    /// Main Menu: PLAY opens the gameplay scene, CHARACTER opens the miner selection, SETTINGS opens the shared settings panel,
-    /// EXIT quits. The title and the button column give way while a sub screen is open; the Android Back key (Escape) closes it.
+    /// Main Menu: PLAY opens the Area Selection (which enters the gameplay scene), CHARACTER opens the miner selection, SETTINGS opens the shared
+    /// settings panel, EXIT quits. The title and the button column give way while a sub screen is open; the Android Back key (Escape) closes it.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MainMenuController : MonoBehaviour
@@ -25,13 +25,14 @@ namespace ItemCollector3D.Menus
         [SerializeField] private GameObject titleRoot;
         [SerializeField] private SettingsPanelController settingsPanel;
         [SerializeField] private CharacterSelectController characterPanel;
-        [SerializeField] private string gameplaySceneName = SceneNavigator.GameplayScene;
+        [SerializeField] private AreaSelectController areaPanel;
 
         /// <summary>Test hook: when set EXIT calls this instead of quitting the application.</summary>
         public static Action ExitHook;
 
         public bool IsSettingsOpen => settingsPanel != null && settingsPanel.IsOpen;
         public bool IsCharacterSelectOpen => characterPanel != null && characterPanel.IsOpen;
+        public bool IsAreaSelectOpen => areaPanel != null && areaPanel.IsOpen;
 
         private void Awake()
         {
@@ -66,6 +67,12 @@ namespace ItemCollector3D.Menus
                 characterPanel.Closed += ShowHome;
                 characterPanel.Hide();
             }
+
+            if (areaPanel != null)
+            {
+                areaPanel.Closed += ShowHome;
+                areaPanel.Hide();
+            }
         }
 
         private void OnDestroy()
@@ -78,6 +85,11 @@ namespace ItemCollector3D.Menus
             if (characterPanel != null)
             {
                 characterPanel.Closed -= ShowHome;
+            }
+
+            if (areaPanel != null)
+            {
+                areaPanel.Closed -= ShowHome;
             }
         }
 
@@ -94,12 +106,28 @@ namespace ItemCollector3D.Menus
                 {
                     characterPanel.Cancel();
                 }
+                else if (IsAreaSelectOpen)
+                {
+                    areaPanel.Cancel();
+                }
             }
         }
 
+        /// <summary>PLAY: opens the Area Selection (it no longer loads the gameplay scene directly).</summary>
         public void Play()
         {
-            SceneNavigator.Load(gameplaySceneName);
+            OpenAreaSelect();
+        }
+
+        public void OpenAreaSelect()
+        {
+            if (areaPanel == null)
+            {
+                return;
+            }
+
+            SetHomeVisible(false);
+            areaPanel.Open();
         }
 
         public void OpenSettings()

@@ -293,6 +293,9 @@ namespace ItemCollector3D.EditorTools
                 RectTransform characterPanel = BuildCharacterPanel(root.transform, catalog, out CharacterSelectController selectController);
                 characterPanel.gameObject.SetActive(false);
 
+                // Area Selection (PLAY opens it): built by AreaUiBuilder, so a full rebuild keeps it
+                AreaSelectController areaController = AreaUiBuilder.BuildPanel(root.transform);
+
                 var controller = root.GetComponent<MainMenuController>();
                 SetRef(controller, "playButton", play);
                 SetRef(controller, "characterButton", character);
@@ -302,6 +305,7 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "titleRoot", titleRoot.gameObject);
                 SetRef(controller, "settingsPanel", settingsInstance.GetComponent<SettingsPanelController>());
                 SetRef(controller, "characterPanel", selectController);
+                SetRef(controller, "areaPanel", areaController);
                 PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
             }
             finally
