@@ -118,6 +118,15 @@ namespace ItemCollector3D.Menus
             mode = newMode;
         }
 
+        /// <summary>Shows or hides the whole miner stage (miner, pedestal, lamp light). Used by screens that fill the scene with their own UI, e.g. Area Selection.</summary>
+        public void SetVisible(bool visible)
+        {
+            if (anchor != null)
+            {
+                anchor.gameObject.SetActive(visible);
+            }
+        }
+
         /// <summary>Shows the saved miner (used when leaving the selection screen without picking).</summary>
         public void ShowSelected(int direction = 0)
         {

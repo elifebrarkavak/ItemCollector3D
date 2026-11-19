@@ -14,6 +14,29 @@ namespace ItemCollector3D.EditorTools
 
         public static Sprite S(string name) => UiSpriteFactory.Load(name);
 
+        /// <summary>Share of the screen height kept free at the left, right and bottom edges for the Android system gestures (about 22 dp on a phone).</summary>
+        public const float GestureMarginFraction = 0.055f;
+
+        /// <summary>
+        /// The one canvas setup of every UI canvas: reference 1920 x 1080 and screen match mode EXPAND. Expand scales by the SMALLER of width / height,
+        /// so the whole 1080 unit high reference layout always fits on screen: a wider phone only adds width (it used to shrink the canvas height
+        /// to about 890 units at 2.6:1 and cut the bottom of the menu). On every screen 16:9 or wider one unit is the same share of the screen height.
+        /// </summary>
+        public static void ConfigureScaler(CanvasScaler scaler)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+        }
+
+        /// <summary>Keeps tappable UI clear of the Android gesture zones (see <see cref="SafeAreaFitter"/>).</summary>
+        public static void ConfigureSafeArea(SafeAreaFitter fitter)
+        {
+            var so = new SerializedObject(fitter);
+            so.FindProperty("gestureMarginFraction").floatValue = GestureMarginFraction;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         // ------------------------------------------------------------------ rects
 
         public static RectTransform Rect(string name, Transform parent)
@@ -102,6 +125,16 @@ namespace ItemCollector3D.EditorTools
             return tmp;
         }
 
+        /// <summary>Small readable text (row labels, values, taglines): the body font, not the slanted display font.</summary>
+        public static TextMeshProUGUI BodyText(Transform parent, string name, string text, float size, Color color,
+            TextAlignmentOptions alignment = TextAlignmentOptions.MidlineLeft, string materialName = "UI_Body_Cream")
+        {
+            TextMeshProUGUI tmp = Text(parent, name, text, size, materialName, color, alignment);
+            tmp.font = UiFonts.BodyFont;
+            tmp.fontSharedMaterial = UiFonts.Load(materialName);
+            return tmp;
+        }
+
         // ------------------------------------------------------------------ buttons
 
         public static string SpriteFor(ButtonStyle style) => style switch
@@ -129,7 +162,7 @@ namespace ItemCollector3D.EditorTools
         {
             RectTransform root = Rect(name, parent);
             root.sizeDelta = size;
-            Shadow(root, size, new Vector2(0f, -12f), 0.5f, 40f);
+            Shadow(root, size, new Vector2(0f, -10f), 0.38f, 32f);
 
             Image face = Img(root, "Face", S(SpriteFor(style)), Color.white, true, true);
             Stretch(face.rectTransform);
@@ -156,7 +189,7 @@ namespace ItemCollector3D.EditorTools
         {
             RectTransform root = Rect(name, parent);
             root.sizeDelta = new Vector2(size, size);
-            Shadow(root, new Vector2(size, size), new Vector2(0f, -10f), 0.5f, 30f);
+            Shadow(root, new Vector2(size, size), new Vector2(0f, -8f), 0.38f, 24f);
             Image face = Img(root, "Face", S(spriteName), Color.white, false, true);
             Stretch(face.rectTransform);
             face.preserveAspect = true;
@@ -208,12 +241,12 @@ namespace ItemCollector3D.EditorTools
         {
             RectTransform window = Rect(name, parent);
             Center(window, Vector2.zero, size);
-            Shadow(window, size, new Vector2(0f, -18f), 0.6f, 64f);
+            Shadow(window, size, new Vector2(0f, -14f), 0.34f, 44f); // lighter than stage 8 (0.6 / 64)
             Image frame = Img(window, "Frame", S("ui_panel_wood"), Color.white, true, true);
             Stretch(frame.rectTransform);
             Image grain = Img(window, "Grain", S("ui_wood_grain"), new Color(1f, 1f, 1f, 0.55f), false);
             grain.type = Image.Type.Tiled;
-            Stretch(grain.rectTransform, 38f, 38f, 38f, 38f);
+            Stretch(grain.rectTransform, 30f, 30f, 30f, 30f);
             return window;
         }
 
@@ -222,7 +255,7 @@ namespace ItemCollector3D.EditorTools
             RectTransform banner = Rect(name, parent);
             Place(banner, new Vector2(0.5f, 1f), position, size);
             banner.pivot = new Vector2(0.5f, 0.5f);
-            Shadow(banner, size, new Vector2(0f, -10f), 0.45f, 30f);
+            Shadow(banner, size, new Vector2(0f, -8f), 0.32f, 24f);
             Image image = Img(banner, "Bg", S("ui_banner"), Color.white);
             Stretch(image.rectTransform);
             TextMeshProUGUI title = Text(banner, "Heading", text, fontSize, "UI_Title_Gold", Gold); // not "Title": that name belongs to the game title

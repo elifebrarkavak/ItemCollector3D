@@ -8,7 +8,7 @@ namespace ItemCollector3D.Menus
 {
     /// <summary>
     /// Character Selection: big 3D miner in the middle (drawn by <see cref="MenuCharacterStage"/>), arrows left and right, the name
-    /// below and a SELECT button that saves the choice (PlayerPrefs through <see cref="CharacterSelection"/>). BACK leaves without
+    /// below and a SELECT button (SELECTED on the miner that is already chosen) that saves the choice (PlayerPrefs through <see cref="CharacterSelection"/>). BACK leaves without
     /// changing the saved miner. The two miners have identical abilities.
     /// </summary>
     [DisallowMultipleComponent]
@@ -23,7 +23,8 @@ namespace ItemCollector3D.Menus
         [SerializeField] private TMP_Text nameLabel;
         [SerializeField] private TMP_Text taglineLabel;
         [SerializeField] private TMP_Text selectLabel;
-        [SerializeField] private GameObject equippedBadge;
+        [Tooltip("The check mark on the select button: shown only on the miner that is already selected.")]
+        [SerializeField] private GameObject selectedMark;
         [SerializeField] private Image[] dots = Array.Empty<Image>();
         [SerializeField] private Color dotActive = new Color(0.949f, 0.722f, 0.247f, 1f);
         [SerializeField] private Color dotInactive = new Color(0.44f, 0.27f, 0.19f, 1f);
@@ -143,7 +144,7 @@ namespace ItemCollector3D.Menus
             if (nameLabel != null) { nameLabel.text = entry.displayName; }
             if (taglineLabel != null) { taglineLabel.text = entry.tagline; }
             if (selectLabel != null) { selectLabel.text = equipped ? "SELECTED" : "SELECT"; }
-            if (equippedBadge != null) { equippedBadge.SetActive(equipped); }
+            if (selectedMark != null) { selectedMark.SetActive(equipped); }
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] != null)

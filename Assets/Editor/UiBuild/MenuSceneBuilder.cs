@@ -444,16 +444,40 @@ namespace ItemCollector3D.EditorTools
                 UiKit.SetRef(characterPanel, "stage", stage);
             }
 
-            // keep the canvas scaler as required for mobile: Scale With Screen Size, reference 1920 x 1080
-            var scaler = GameObject.Find("UI Canvas").GetComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
+            ConfigureUi();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>
+        /// Canvas setup + character stage framing of the open Main Menu scene (stage 10). Called by the full rebuild above and callable on its own
+        /// (<see cref="ApplyUiSettings"/>) so the generated scene and the builder never disagree.
+        /// </summary>
+        private static void ConfigureUi()
+        {
+            UiKit.ConfigureScaler(GameObject.Find("UI Canvas").GetComponent<UnityEngine.UI.CanvasScaler>());
+            UiKit.ConfigureSafeArea(GameObject.Find("SafeAreaRoot").GetComponent<SafeAreaFitter>());
+
+            // Character Selection: the miner stands higher and a little smaller so the centred name / SELECT column fits under the pedestal
+            var stage = Object.FindAnyObjectByType<MenuCharacterStage>(FindObjectsInactive.Include);
+            if (stage != null)
+            {
+                var so = new SerializedObject(stage);
+                so.FindProperty("selectAnchor").vector2Value = new Vector2(0.5f, 0.375f);
+                so.FindProperty("selectHeightFraction").floatValue = 0.47f;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>Re-applies only the canvas / safe area / stage settings to the Main Menu scene and saves it (no full scene rebuild).</summary>
+        public static void ApplyUiSettings()
+        {
+            Scene scene = SceneManager.GetActiveScene().path == ScenePath ? SceneManager.GetActiveScene() : EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            ConfigureUi();
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
         }
 
         private static void SetArray(SerializedProperty property, Object[] values)

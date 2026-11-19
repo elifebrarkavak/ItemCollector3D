@@ -10,7 +10,7 @@ namespace ItemCollector3D.UI
     /// </summary>
     public sealed class ScreenFader : MonoBehaviour
     {
-        public const float FadeSeconds = 0.4f;
+        public const float FadeSeconds = 0.28f;
 
         private static ScreenFader instance;
         private Image image;

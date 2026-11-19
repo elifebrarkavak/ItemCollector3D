@@ -15,7 +15,7 @@ namespace ItemCollector3D.EditorTools
             Type sizesType = typeof(Editor).Assembly.GetType("UnityEditor.GameViewSizes");
             Type singleton = typeof(ScriptableSingleton<>).MakeGenericType(sizesType);
             object sizes = singleton.GetProperty("instance").GetValue(null);
-            object group = sizesType.GetMethod("GetGroup").Invoke(sizes, new object[] { (int)GameViewSizeGroupType.Standalone });
+            object group = sizesType.GetProperty("currentGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(sizes); // the group the Game View really shows
             Type groupType = group.GetType();
             Type sizeType = typeof(Editor).Assembly.GetType("UnityEditor.GameViewSize");
 
@@ -43,7 +43,7 @@ namespace ItemCollector3D.EditorTools
             Type sizesType = typeof(Editor).Assembly.GetType("UnityEditor.GameViewSizes");
             Type singleton = typeof(ScriptableSingleton<>).MakeGenericType(sizesType);
             object sizes = singleton.GetProperty("instance").GetValue(null);
-            object group = sizesType.GetMethod("GetGroup").Invoke(sizes, new object[] { (int)GameViewSizeGroupType.Standalone });
+            object group = sizesType.GetProperty("currentGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(sizes); // the group the Game View really shows
             Type groupType = group.GetType();
 
             Type sizeType = typeof(Editor).Assembly.GetType("UnityEditor.GameViewSize");

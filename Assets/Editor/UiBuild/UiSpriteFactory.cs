@@ -35,7 +35,7 @@ namespace ItemCollector3D.EditorTools
             Save("ui_round_gold", RoundButton(128, GoldLight, Gold, GoldDark, Hex("#FFF3C4")), 0);
 
             // ------------------------------------------------ panels
-            Save("ui_panel_wood", WoodPanel(256, 256), 88);
+            Save("ui_panel_wood", WoodPanel(256, 256), 72);
             Save("ui_row_inset", RowInset(128, 128), 46);
             Save("ui_banner", Banner(256, 128), 60);
             Save("ui_badge", Badge(128, 128), 44);
@@ -74,6 +74,33 @@ namespace ItemCollector3D.EditorTools
             Save("ui_wood_grain", WoodGrain(256), 0, tile: true);
             Save("ui_dot", Dot(48), 0);
 
+            BuildHudSprites();
+            BuildAreaSprites();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>Sprites of the gameplay HUD (stage 9): pickaxe icon, translucent joystick, gold progress fill, signal-meter pill.</summary>
+        public static void BuildHudSprites()
+        {
+            Directory.CreateDirectory(Folder);
+            Save("icon_pickaxe", IconPickaxe(), 0);
+            Save("ui_joy_base", JoystickBase(256), 0);
+            Save("ui_joy_knob", JoystickKnob(128), 0);
+            Save("ui_bar_fill", BarFill(64, 64), 0);
+            Save("ui_pill", Pill(64, 64), 22);
+            Save("ui_shade_top", Shade(8, 64, false), 0); // soft gradients: dark at the top / left, clear at the other end (stretched under menu text)
+            Save("ui_shade_left", Shade(64, 8, true), 0);
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>Sprites of the Area Selection (stage 11): the padlock of a locked area card / button. Only generates what is new, the rest of the set is untouched.</summary>
+        public static void BuildAreaSprites()
+        {
+            Directory.CreateDirectory(Folder);
+            Sdf shackle = Intersect(Ring(64, 54, 21f, 7f), (x, y) => y - 58f);
+            Sdf body = RoundRectBox(30, 54, 98, 108, 13);
+            Sdf keyhole = Union(Circle(64, 76, 8.5f), Polygon(new Vector2(59, 80), new Vector2(69, 80), new Vector2(72, 96), new Vector2(56, 96)));
+            Save("icon_lock", Icon(Subtract(Union(shackle, body), keyhole), Cream), 0);
             AssetDatabase.Refresh();
         }
 
@@ -112,17 +139,18 @@ namespace ItemCollector3D.EditorTools
 
         private static Raster WoodPanel(int w, int h)
         {
+            // stage 10: a slimmer frame (the wood rim is 14 px, was 21) and a thin groove, so the panel reads lighter and the content gets more room
             var rs = new Raster(w, h);
             rs.Fill(RoundRectBox(0, 0, w, h, 52), Outline);
-            Sdf frame = RoundRectBox(5, 5, w - 5, h - 5, 47);
-            rs.Fill(frame, VerticalGradient(5, h - 5, WoodLight, Hex("#734A31")));
-            rs.Fill(Subtract(frame, Offset(frame, 0f, 3.5f)), Alpha(Hex("#D9A272"), 0.55f));
+            Sdf frame = RoundRectBox(4, 4, w - 4, h - 4, 48);
+            rs.Fill(frame, VerticalGradient(4, h - 4, WoodLight, Hex("#734A31")));
+            rs.Fill(Subtract(frame, Offset(frame, 0f, 3f)), Alpha(Hex("#D9A272"), 0.5f));
             // groove around the board
-            rs.Fill(RoundRectBox(26, 26, w - 26, h - 26, 30), WoodDeepest);
-            Sdf board = RoundRectBox(30, 30, w - 30, h - 30, 26);
-            rs.Fill(board, VerticalGradient(30, h - 30, Hex("#6E4533"), Hex("#563424")));
-            rs.Fill(Subtract(board, Offset(board, 0f, 12f)), new Color(0f, 0f, 0f, 0.22f)); // inner shadow, board looks recessed
-            rs.Fill(Subtract(Offset(board, 0f, 2f), board), Alpha(Hex("#9A6A4C"), 0.45f)); // lower lip catches light
+            rs.Fill(RoundRectBox(18, 18, w - 18, h - 18, 34), WoodDeepest);
+            Sdf board = RoundRectBox(21, 21, w - 21, h - 21, 31);
+            rs.Fill(board, VerticalGradient(21, h - 21, Hex("#6E4533"), Hex("#563424")));
+            rs.Fill(Subtract(board, Offset(board, 0f, 12f)), new Color(0f, 0f, 0f, 0.20f)); // inner shadow, board looks recessed
+            rs.Fill(Subtract(Offset(board, 0f, 2f), board), Alpha(Hex("#9A6A4C"), 0.40f)); // lower lip catches light
             return rs;
         }
 
@@ -273,6 +301,92 @@ namespace ItemCollector3D.EditorTools
             rs.Fill(Polygon(new Vector2(26, 42), new Vector2(60, 42), new Vector2(64, 116)), Gold);
             rs.Fill(Polygon(new Vector2(102, 42), new Vector2(68, 42), new Vector2(64, 116)), GoldDark);
             rs.Fill(Polygon(new Vector2(60, 42), new Vector2(68, 42), new Vector2(64, 116)), Hex("#E0A12B"));
+            return rs;
+        }
+
+        private static Raster IconPickaxe()
+        {
+            var rs = new Raster(128, 128);
+            // handle from the lower left up to the middle of the head; the head is a thick crescent across the handle's top end
+            Vector2 up = new Vector2(52f, -68f).normalized;
+            var centre = new Vector2(60f, 68f);
+            Sdf handle = Capsule(26, 110, centre.x + up.x * 52f, centre.y + up.y * 52f, 8f);
+            Vector2 innerCentre = centre - up * 18f;
+            Sdf crescent = Intersect(
+                Subtract(Circle(centre.x, centre.y, 62f), Circle(innerCentre.x, innerCentre.y, 57f)),
+                (x, y) => -((x - centre.x) * up.x + (y - centre.y) * up.y) - 6f);
+            Sdf all = Union(handle, crescent);
+            rs.Fill(Grow(Offset(all, 0f, 3f), 5f), new Color(0f, 0f, 0f, 0.28f));
+            rs.Fill(Grow(all, 5f), Outline);
+            rs.Fill(handle, VerticalGradient(30, 110, Hex("#D9A272"), Hex("#9A6844")));
+            rs.Fill(crescent, VerticalGradient(10, 100, Hex("#FFFFFF"), Hex("#C9D5E4")));
+            rs.Fill(Subtract(crescent, Offset(crescent, 0f, 4f)), new Color(1f, 1f, 1f, 0.9f));
+            return rs;
+        }
+
+        private static Raster JoystickBase(int s)
+        {
+            var rs = new Raster(s, s);
+            float c = s * 0.5f;
+            rs.Fill(Circle(c, c, c - 4f), Alpha(NavyDeep, 0.46f)); // translucent cave-navy disc
+            rs.Fill(Circle(c, c, 56f), new Color(0f, 0f, 0f, 0.16f)); // the dock the knob rests in
+            rs.Fill(Ring(c, c, c - 6f, 3.5f), Alpha(Cream, 0.82f)); // outer rim
+            rs.Fill(Ring(c, c, 78f, 1.6f), Alpha(Cream, 0.20f)); // inner guide ring
+            for (int i = 0; i < 4; i++) // direction chevrons
+            {
+                float a = i * Mathf.PI * 0.5f;
+                Vector2 Rot(float dx, float dy) => new Vector2(c + dx * Mathf.Cos(a) - dy * Mathf.Sin(a), c + dx * Mathf.Sin(a) + dy * Mathf.Cos(a));
+                rs.Fill(Polygon(Rot(-13f, -88f), Rot(13f, -88f), Rot(0f, -108f)), Alpha(Cream, 0.78f));
+            }
+
+            return rs;
+        }
+
+        private static Raster JoystickKnob(int s)
+        {
+            var rs = new Raster(s, s);
+            float c = s * 0.5f;
+            rs.Fill(Circle(c, c + 3f, c - 3f), new Color(0f, 0f, 0f, 0.28f));
+            rs.Fill(Circle(c, c, c - 5f), Alpha(Outline, 0.9f));
+            rs.Fill(Circle(c, c, c - 9f), VerticalGradient(9, s - 9, GoldLight, GoldDark));
+            rs.Fill(Circle(c, c + 3f, c - 27f), Alpha(GoldDeep, 0.30f)); // soft dish in the middle
+            rs.Fill(Circle(c, c + 1f, c - 31f), VerticalGradient(30, s - 30, Hex("#FFE9A3"), GoldLight));
+            rs.Fill(Ellipse(c - 7f, c - 25f, 19f, 8f), new Color(1f, 1f, 1f, 0.62f));
+            return rs;
+        }
+
+        private static Raster BarFill(int w, int h)
+        {
+            var rs = new Raster(w, h);
+            rs.FillAll((x, y) =>
+            {
+                float t = y / h;
+                Color c = Color.Lerp(GoldLight, GoldDark, Mathf.Clamp01(t * 1.15f));
+                if (t < 0.26f) { c = Color.Lerp(c, Hex("#FFF3C4"), 0.55f * (1f - t / 0.26f)); }
+                if (t > 0.86f) { c = Color.Lerp(c, GoldDeep, (t - 0.86f) / 0.14f * 0.8f); }
+                return c;
+            });
+            return rs;
+        }
+
+        private static Raster Shade(int w, int h, bool horizontal)
+        {
+            var rs = new Raster(w, h);
+            rs.FillAll((x, y) =>
+            {
+                float t = horizontal ? x / w : y / h; // 0 = the dark end (image space, y down: the top row)
+                return new Color(0.03f, 0.05f, 0.09f, Mathf.Pow(1f - Mathf.Clamp01(t), 1.6f));
+            });
+            return rs;
+        }
+
+        private static Raster Pill(int w, int h)
+        {
+            var rs = new Raster(w, h);
+            rs.Fill(RoundRectBox(0, 0, w, h, 22), Outline);
+            Sdf body = RoundRectBox(3, 3, w - 3, h - 3, 19);
+            rs.Fill(body, VerticalGradient(3, h - 3, Color.white, new Color(0.78f, 0.78f, 0.78f, 1f)));
+            rs.Fill(Subtract(body, Offset(body, 0f, 4f)), new Color(1f, 1f, 1f, 0.55f));
             return rs;
         }
 

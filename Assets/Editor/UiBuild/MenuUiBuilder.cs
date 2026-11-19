@@ -1,3 +1,4 @@
+using System.IO;
 using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
 using ItemCollector3D.UI;
@@ -18,6 +19,16 @@ namespace ItemCollector3D.EditorTools
         public const string MainMenuPath = "Assets/Prefabs/Menus/MainMenuUI.prefab";
         public const string CatalogPath = CharacterBuilder.CatalogPath;
 
+        // ---- stage 10 layout (1920x1080 reference units; the canvas scaler EXPANDS, so the height is never less than 1080)
+        /// <summary>A phone's 48 dp touch target in reference units (126 on a 1080 px high, 2.625x screen; 128 keeps a margin).</summary>
+        public const float TouchUnits = 128f;
+        private const float MenuColumnX = 110f;        // distance of the button column from the (gesture-safe) left edge
+        private const float MenuColumnBottom = 96f;    // distance of EXIT from the (gesture-safe) bottom edge: anchored to the BOTTOM so EXIT can never be cut
+        private const float MenuColumnWidth = 520f;
+        private const float PlayHeight = 176f;
+        private const float MenuButtonHeight = TouchUnits;
+        private const float MenuGap = 22f;
+
         public static void BuildAll()
         {
             BuildSettings();
@@ -37,18 +48,19 @@ namespace ItemCollector3D.EditorTools
                 var rootRect = (RectTransform)root.transform;
                 Stretch(rootRect);
 
-                Dim(root.transform, 0.66f);
+                Dim(root.transform, 0.6f);
                 RectTransform window = WoodWindow(root.transform, new Vector2(1300f, 740f));
-                window.anchoredPosition = new Vector2(0f, -30f); // clear of the gameplay HUD header when opened from the pause menu
-                Entrance(window.gameObject, UiEntrance.Style.Pop, 0f, 0.3f);
+                window.anchoredPosition = new Vector2(0f, -30f);
+                Entrance(window.gameObject, UiEntrance.Style.Pop, 0f, 0.24f);
 
                 TitleBanner(window, "SETTINGS", new Vector2(660f, 150f), 84f, new Vector2(0f, -4f));
 
-                Button close = RoundButton(window, "CloseButton", "ui_round_navy", "icon_close", 126f, 66f);
-                Place(close.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-34f, -34f), new Vector2(126f, 126f));
+                Button close = RoundButton(window, "CloseButton", "ui_round_navy", "icon_close", TouchUnits, 66f);
+                Place(close.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-34f, -34f), new Vector2(TouchUnits, TouchUnits));
                 close.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
                 close.GetComponent<RectTransform>().anchoredPosition = new Vector2(-30f, -22f);
 
+                // three equal rows: 128 high with an equal 18 unit gap (pitch 146)
                 Slider music = SettingRow(window, "MusicRow", "Music Volume", "icon_music", 215f, out TMP_Text musicValue);
                 Slider sfx = SettingRow(window, "SfxRow", "Sound Effects", "icon_sfx", 69f, out TMP_Text sfxValue);
                 Slider camera = SettingRow(window, "CameraRow", "Camera Sensitivity", "icon_camera", -77f, out TMP_Text cameraValue);
@@ -76,21 +88,22 @@ namespace ItemCollector3D.EditorTools
         private static Slider SettingRow(Transform window, string name, string label, string icon, float y, out TMP_Text valueLabel)
         {
             RectTransform row = Rect(name, window);
-            Center(row, new Vector2(0f, y), new Vector2(1120f, 128f));
+            Center(row, new Vector2(0f, y), new Vector2(1120f, TouchUnits));
             Image bg = Img(row, "Bg", S("ui_row_inset"), new Color(1f, 1f, 1f, 0.95f));
             Stretch(bg.rectTransform);
 
             Image iconImage = Img(row, "Icon", S(icon), Color.white, false);
-            Place(iconImage.rectTransform, new Vector2(0f, 0.5f), new Vector2(26f, 2f), new Vector2(84f, 84f));
+            Place(iconImage.rectTransform, new Vector2(0f, 0.5f), new Vector2(26f, 0f), new Vector2(80f, 80f));
 
-            TextMeshProUGUI text = Text(row, "Label", label, 44f, "UI_Text_Label", Cream, TextAlignmentOptions.MidlineLeft);
-            Place(text.rectTransform, new Vector2(0f, 0.5f), new Vector2(124f, 2f), new Vector2(380f, 100f));
+            // small text: the upright body font (the slanted display font is for titles and big buttons)
+            TextMeshProUGUI text = BodyText(row, "Label", label, 40f, Cream);
+            Place(text.rectTransform, new Vector2(0f, 0.5f), new Vector2(124f, 0f), new Vector2(392f, 96f));
 
             Slider slider = BuildSlider(row);
-            Place(slider.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(172f, 0f), new Vector2(390f, 124f));
+            Place(slider.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(172f, 0f), new Vector2(390f, TouchUnits));
 
-            TextMeshProUGUI value = Text(row, "Value", "100%", 50f, "UI_Text_Brown", Gold, TextAlignmentOptions.MidlineRight);
-            Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(-28f, 2f), new Vector2(150f, 100f));
+            TextMeshProUGUI value = BodyText(row, "Value", "100%", 44f, Gold, TextAlignmentOptions.MidlineRight, "UI_Body_Gold");
+            Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(-28f, 0f), new Vector2(150f, 96f));
             value.rectTransform.pivot = new Vector2(1f, 0.5f);
             valueLabel = value;
             return slider;
@@ -99,8 +112,8 @@ namespace ItemCollector3D.EditorTools
         private static Slider BuildSlider(Transform parent)
         {
             RectTransform root = Rect("Slider", parent);
-            root.sizeDelta = new Vector2(390f, 124f);
-            // invisible full-size hit area: a 124 px high touch zone (about 47 dp) around a slimmer track
+            root.sizeDelta = new Vector2(390f, TouchUnits);
+            // invisible full-size hit area: a 128 unit high touch zone (48 dp) around a slimmer track
             Image hit = Img(root, "HitArea", null, new Color(0f, 0f, 0f, 0f), false, true);
             Stretch(hit.rectTransform);
 
@@ -155,24 +168,31 @@ namespace ItemCollector3D.EditorTools
             {
                 ClearChildren(root.transform);
 
-                // the HUD button that opens the pause menu: a round wood button in the top-right corner
+                // the HUD button that opens the pause menu: a round wood button in the top-left corner, next to the level name plate
                 Button pauseButton = RoundButton(root.transform, "PauseButton", "ui_round_wood", "icon_pause", 132f, 70f);
-                Place(pauseButton.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-24f, -24f), new Vector2(132f, 132f));
+                Place(pauseButton.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(32f, -28f), new Vector2(132f, 132f));
 
                 RectTransform panel = Rect("PausePanel", root.transform);
                 Stretch(panel);
-                Dim(panel, 0.62f);
-                RectTransform window = WoodWindow(panel, new Vector2(720f, 640f));
-                window.anchoredPosition = new Vector2(0f, -50f); // sits below the HUD header (the PAUSED banner overlaps the window's top edge)
-                Entrance(window.gameObject, UiEntrance.Style.Pop, 0f, 0.28f);
-                TitleBanner(window, "PAUSED", new Vector2(520f, 140f), 82f, new Vector2(0f, -4f));
+                // a controlled dim: a flat veil plus a soft vignette that darkens the edges more (no real-time blur, two cheap sprites)
+                Dim(panel, 0.5f);
+                Image vignette = Img(panel, "Vignette", S("ui_vignette"), new Color(1f, 1f, 1f, 0.7f), false);
+                vignette.preserveAspect = false;
+                Stretch(vignette.rectTransform, -300f, -300f, -300f, -300f);
 
-                Button resume = TextButton(window, "ResumeButton", "RESUME", ButtonStyle.Gold, new Vector2(540f, 156f), 86f, "icon_play");
-                Center(resume.GetComponent<RectTransform>(), new Vector2(0f, 112f), new Vector2(540f, 156f));
-                Button settings = TextButton(window, "SettingsButton", "SETTINGS", ButtonStyle.Wood, new Vector2(540f, 128f), 62f, "icon_gear");
-                Center(settings.GetComponent<RectTransform>(), new Vector2(0f, -62f), new Vector2(540f, 128f));
-                Button mainMenu = TextButton(window, "MainMenuButton", "MAIN MENU", ButtonStyle.Navy, new Vector2(540f, 128f), 62f, "icon_exit");
-                Center(mainMenu.GetComponent<RectTransform>(), new Vector2(0f, -216f), new Vector2(540f, 128f));
+                // compact window: 600 x 560 (was 720 x 640); the buttons keep their 48 dp touch size (128 / 136 high)
+                RectTransform window = WoodWindow(panel, new Vector2(600f, 560f));
+                window.anchoredPosition = new Vector2(0f, -20f); // the PAUSED banner overlaps the window's top edge; the HUD is hidden while paused (HideWhilePaused)
+                Entrance(window.gameObject, UiEntrance.Style.Pop, 0f, 0.22f);
+                TitleBanner(window, "PAUSED", new Vector2(440f, 116f), 74f, new Vector2(0f, -4f));
+
+                var buttonSize = new Vector2(460f, TouchUnits);
+                Button resume = TextButton(window, "ResumeButton", "RESUME", ButtonStyle.Gold, new Vector2(460f, 140f), 80f, "icon_play");
+                Center(resume.GetComponent<RectTransform>(), new Vector2(0f, 128f), new Vector2(460f, 140f));
+                Button settings = TextButton(window, "SettingsButton", "SETTINGS", ButtonStyle.Wood, buttonSize, 58f, "icon_gear");
+                Center(settings.GetComponent<RectTransform>(), new Vector2(0f, -22f), buttonSize);
+                Button mainMenu = TextButton(window, "MainMenuButton", "MAIN MENU", ButtonStyle.Navy, buttonSize, 58f, "icon_exit");
+                Center(mainMenu.GetComponent<RectTransform>(), new Vector2(0f, -172f), buttonSize);
 
                 var nested = (GameObject)PrefabUtility.InstantiatePrefab(settingsPrefab, root.transform);
                 nested.name = "SettingsPanel";
@@ -207,42 +227,62 @@ namespace ItemCollector3D.EditorTools
                 ClearChildren(root.transform);
                 Stretch((RectTransform)root.transform);
 
-                // ---- title
+                // ---- logo: ONE lockup (title + 3D badge + two gems), centred at the top
                 RectTransform titleRoot = Rect("TitleRoot", root.transform);
-                Place(titleRoot, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1500f, 220f));
+                Place(titleRoot, new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1300f, 210f));
                 titleRoot.pivot = new Vector2(0.5f, 1f);
-                Entrance(titleRoot.gameObject, UiEntrance.Style.SlideFromTop, 0.05f, 0.5f, 180f);
+                Entrance(titleRoot.gameObject, UiEntrance.Style.SlideFromTop, 0.02f, 0.32f, 160f);
 
-                TextMeshProUGUI title = Text(titleRoot, "Title", "ITEM COLLECTOR", 140f, "UI_Title_Gold", Gold);
-                Center(title.rectTransform, new Vector2(-150f, -4f), new Vector2(1100f, 200f));
+                // a soft dark gradient behind the logo: the bright tunnel glow never fights the gold letters
+                Image shadeTop = Img(titleRoot, "Shade", S("ui_shade_top"), new Color(1f, 1f, 1f, 1f), false);
+                shadeTop.preserveAspect = false;
+                Place(shadeTop.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, 600f), new Vector2(6000f, 1120f));
+                shadeTop.rectTransform.pivot = new Vector2(0.5f, 1f);
+
+                TextMeshProUGUI title = Text(titleRoot, "Title", "ITEM COLLECTOR", 128f, "UI_Title_Gold", GoldLight);
                 title.verticalAlignment = VerticalAlignmentOptions.Middle;
                 title.characterSpacing = 2f;
+                title.ForceMeshUpdate();
+                float textWidth = title.GetPreferredValues("ITEM COLLECTOR").x + 28f;
+                const float badgeWidth = 188f;
+                const float badgeTuck = -6f;                                   // the badge sits right after the last letter (a small gap, never over it)
+                float lockupWidth = textWidth + badgeWidth - badgeTuck;
+                float titleCentre = -lockupWidth * 0.5f + textWidth * 0.5f;
+                Center(title.rectTransform, new Vector2(titleCentre, -6f), new Vector2(textWidth + 40f, 190f));
 
                 RectTransform badge = Rect("TitleBadge", titleRoot);
-                Center(badge, new Vector2(520f, -10f), new Vector2(210f, 138f));
-                badge.localRotation = Quaternion.Euler(0f, 0f, -6f);
-                Shadow(badge, new Vector2(210f, 138f), new Vector2(0f, -8f), 0.5f, 26f);
+                Center(badge, new Vector2(titleCentre + textWidth * 0.5f - badgeTuck + badgeWidth * 0.5f, 26f), new Vector2(badgeWidth, 124f));
+                badge.localRotation = Quaternion.Euler(0f, 0f, -5f);
+                Shadow(badge, new Vector2(badgeWidth, 124f), new Vector2(0f, -6f), 0.34f, 20f);
                 Image badgeBg = Img(badge, "Bg", S("ui_badge"), Color.white);
                 Stretch(badgeBg.rectTransform);
-                TextMeshProUGUI badgeText = Text(badge, "Text", "3D", 104f, "UI_Text_Green", Cream);
+                TextMeshProUGUI badgeText = Text(badge, "Text", "3D", 96f, "UI_Text_Green", Cream);
                 Stretch(badgeText.rectTransform, 0, 6, 0, 0);
                 badgeText.verticalAlignment = VerticalAlignmentOptions.Middle;
                 Image gemL = Img(titleRoot, "GemL", S("icon_gem"), Color.white, false);
-                Center(gemL.rectTransform, new Vector2(-680f, 14f), new Vector2(92f, 92f));
+                Center(gemL.rectTransform, new Vector2(-lockupWidth * 0.5f - 34f, 10f), new Vector2(72f, 72f));
                 gemL.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 14f);
                 Image gemR = Img(titleRoot, "GemR", S("icon_gem"), Color.white, false);
-                Center(gemR.rectTransform, new Vector2(660f, 62f), new Vector2(62f, 62f));
+                Center(gemR.rectTransform, new Vector2(lockupWidth * 0.5f + 34f, 64f), new Vector2(52f, 52f));
                 gemR.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -18f);
 
-                // ---- the vertical button column on the left
+                // ---- the vertical button column, anchored to the BOTTOM-left of the safe area: EXIT keeps a fixed margin above the
+                // bottom edge on every screen (it used to hang from the top with absolute offsets and was cut off on wide phones)
+                float columnHeight = PlayHeight + 3f * MenuButtonHeight + 3f * MenuGap;
                 RectTransform buttons = Rect("Buttons", root.transform);
-                Place(buttons, new Vector2(0f, 1f), new Vector2(110f, -272f), new Vector2(520f, 720f)); // starts 28 units higher so EXIT keeps a margin on 21:9 screens
-                buttons.pivot = new Vector2(0f, 1f);
+                Place(buttons, new Vector2(0f, 0f), new Vector2(MenuColumnX, MenuColumnBottom), new Vector2(MenuColumnWidth, columnHeight));
+                buttons.pivot = new Vector2(0f, 0f);
 
-                Button play = MenuButton(buttons, "PlayButton", "PLAY", ButtonStyle.Gold, 0f, 176f, 98f, "icon_play", 0.12f, true);
-                Button character = MenuButton(buttons, "CharacterButton", "CHARACTER", ButtonStyle.Wood, 200f, 128f, 56f, "icon_helmet", 0.2f, false);
-                Button settings = MenuButton(buttons, "SettingsButton", "SETTINGS", ButtonStyle.Wood, 348f, 128f, 56f, "icon_gear", 0.28f, false);
-                Button exit = MenuButton(buttons, "ExitButton", "EXIT", ButtonStyle.Navy, 496f, 128f, 56f, "icon_exit", 0.36f, false);
+                Image shadeLeft = Img(buttons, "Shade", S("ui_shade_left"), new Color(1f, 1f, 1f, 0.8f), false);
+                shadeLeft.preserveAspect = false;
+                Place(shadeLeft.rectTransform, new Vector2(0f, 0.5f), new Vector2(-MenuColumnX - 700f, 0f), new Vector2(1500f, 3000f));
+                shadeLeft.rectTransform.pivot = new Vector2(0f, 0.5f);
+
+                float y = 0f;
+                Button play = MenuButton(buttons, "PlayButton", "PLAY", ButtonStyle.Gold, ref y, PlayHeight, 96f, "icon_play", 84f, 0.02f, true);
+                Button character = MenuButton(buttons, "CharacterButton", "CHARACTER", ButtonStyle.Wood, ref y, MenuButtonHeight, 54f, "icon_helmet", 62f, 0.07f, false);
+                Button settings = MenuButton(buttons, "SettingsButton", "SETTINGS", ButtonStyle.Wood, ref y, MenuButtonHeight, 54f, "icon_gear", 62f, 0.12f, false);
+                Button exit = MenuButton(buttons, "ExitButton", "EXIT", ButtonStyle.Navy, ref y, MenuButtonHeight, 54f, "icon_exit", 62f, 0.17f, false);
 
                 // ---- sub screens (hidden until opened): rendered after the buttons so they sit on top
                 var settingsInstance = (GameObject)PrefabUtility.InstantiatePrefab(settingsPrefab, root.transform);
@@ -253,6 +293,9 @@ namespace ItemCollector3D.EditorTools
                 RectTransform characterPanel = BuildCharacterPanel(root.transform, catalog, out CharacterSelectController selectController);
                 characterPanel.gameObject.SetActive(false);
 
+                // Area Selection (PLAY opens it): built by AreaUiBuilder, so a full rebuild keeps it
+                AreaSelectController areaController = AreaUiBuilder.BuildPanel(root.transform);
+
                 var controller = root.GetComponent<MainMenuController>();
                 SetRef(controller, "playButton", play);
                 SetRef(controller, "characterButton", character);
@@ -262,6 +305,7 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "titleRoot", titleRoot.gameObject);
                 SetRef(controller, "settingsPanel", settingsInstance.GetComponent<SettingsPanelController>());
                 SetRef(controller, "characterPanel", selectController);
+                SetRef(controller, "areaPanel", areaController);
                 PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
             }
             finally
@@ -270,16 +314,60 @@ namespace ItemCollector3D.EditorTools
             }
         }
 
-        private static Button MenuButton(Transform parent, string name, string label, ButtonStyle style, float y, float height, float fontSize,
-            string icon, float delay, bool pulse)
+        /// <summary>
+        /// One menu button of the column. The column is stacked from the top of its container with equal gaps; every icon is scaled so its
+        /// VISIBLE shape (not its square image) is the same size in every button of a kind, and sits on the same vertical axis.
+        /// </summary>
+        private static Button MenuButton(Transform parent, string name, string label, ButtonStyle style, ref float yFromTop, float height, float fontSize,
+            string icon, float iconVisual, float delay, bool pulse)
         {
-            Button button = TextButton(parent, name, label, style, new Vector2(520f, height), fontSize, icon, pulse);
+            Button button = TextButton(parent, name, label, style, new Vector2(MenuColumnWidth, height), fontSize, icon, pulse);
             var rt = (RectTransform)button.transform;
-            Place(rt, new Vector2(0f, 1f), new Vector2(0f, -y), new Vector2(520f, height));
+            Place(rt, new Vector2(0f, 1f), new Vector2(0f, -yFromTop), new Vector2(MenuColumnWidth, height));
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(260f, -y - height * 0.5f);
-            Entrance(button.gameObject, UiEntrance.Style.SlideFromLeft, delay, 0.4f, 420f);
+            rt.anchoredPosition = new Vector2(MenuColumnWidth * 0.5f, -yFromTop - height * 0.5f);
+            yFromTop += height + MenuGap;
+            Entrance(button.gameObject, UiEntrance.Style.SlideFromLeft, delay, 0.3f, 320f);
+
+            // icon: same visible size and the same centre axis in every button; label: centred in the space to the right of the icon
+            const float iconAxis = 76f;
+            var iconRect = (RectTransform)button.transform.Find("Icon");
+            Rect content = ContentBounds(icon);
+            // equal visual WEIGHT: scale by the geometric mean of the visible width and height (a wide helmet then looks as big as a round gear), capped
+            float scale = Mathf.Min(iconVisual / Mathf.Sqrt(content.width * content.height), iconVisual * 1.3f / Mathf.Max(content.width, content.height));
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.sizeDelta = new Vector2(scale, scale);
+            iconRect.anchoredPosition = new Vector2(iconAxis - (content.center.x - 0.5f) * scale, 4f - (content.center.y - 0.5f) * scale);
+            var labelRect = (RectTransform)button.transform.Find("Label");
+            labelRect.offsetMin = new Vector2(iconAxis + iconVisual * 0.5f + 18f, 12f);
+            labelRect.offsetMax = new Vector2(-24f, 0f);
             return button;
+        }
+
+        /// <summary>The visible (non-transparent) bounds of an icon sprite as a 0..1 rect of its image, y up. Used to equalise icon sizes.</summary>
+        private static Rect ContentBounds(string spriteName)
+        {
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            texture.LoadImage(File.ReadAllBytes($"{UiSpriteFactory.Folder}/{spriteName}.png"));
+            Color32[] pixels = texture.GetPixels32();
+            int w = texture.width, h = texture.height, minX = w, minY = h, maxX = -1, maxY = -1;
+            for (int py = 0; py < h; py++)
+            {
+                for (int px = 0; px < w; px++)
+                {
+                    if (pixels[py * w + px].a > 150) // the soft drop shadow (alpha about 70) does not count
+                    {
+                        minX = Mathf.Min(minX, px);
+                        maxX = Mathf.Max(maxX, px);
+                        minY = Mathf.Min(minY, py);
+                        maxY = Mathf.Max(maxY, py);
+                    }
+                }
+            }
+
+            Object.DestroyImmediate(texture);
+            return maxX < 0 ? new Rect(0f, 0f, 1f, 1f) : UnityEngine.Rect.MinMaxRect(minX / (float)w, minY / (float)h, (maxX + 1) / (float)w, (maxY + 1) / (float)h);
         }
 
         private static RectTransform BuildCharacterPanel(Transform parent, CharacterCatalog catalog, out CharacterSelectController controller)
@@ -293,51 +381,50 @@ namespace ItemCollector3D.EditorTools
             vignette.preserveAspect = false;
             Stretch(vignette.rectTransform, -300, -300, -300, -300);
 
-            RectTransform banner = TitleBanner(panel, "CHOOSE YOUR MINER", new Vector2(820f, 140f), 74f, new Vector2(0f, -100f));
-            Entrance(banner.gameObject, UiEntrance.Style.SlideFromTop, 0f, 0.4f, 160f);
+            RectTransform banner = TitleBanner(panel, "CHOOSE YOUR MINER", new Vector2(760f, 112f), 66f, new Vector2(0f, -76f));
+            Entrance(banner.gameObject, UiEntrance.Style.SlideFromTop, 0f, 0.3f, 140f);
 
-            Button back = RoundButton(panel, "CharacterBackButton", "ui_round_navy", "icon_chev_l", 132f, 70f);
-            Place(back.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(40f, -40f), new Vector2(132f, 132f));
+            // BACK is a labelled navy button (leaves the screen); the round wood chevrons only browse the miners: different shape, colour and word
+            Button back = TextButton(panel, "CharacterBackButton", "BACK", ButtonStyle.Navy, new Vector2(250f, TouchUnits), 58f, "icon_chev_l");
+            Place(back.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(40f, -28f), new Vector2(250f, TouchUnits));
 
-            Button left = RoundButton(panel, "LeftArrow", "ui_round_wood", "icon_chev_l", 150f, 84f);
-            Center(left.GetComponent<RectTransform>(), new Vector2(-560f, 30f), new Vector2(150f, 150f));
-            Entrance(left.gameObject, UiEntrance.Style.SlideFromLeft, 0.05f, 0.35f, 200f);
-            Button right = RoundButton(panel, "RightArrow", "ui_round_wood", "icon_chev_r", 150f, 84f);
-            Center(right.GetComponent<RectTransform>(), new Vector2(560f, 30f), new Vector2(150f, 150f));
-            Entrance(right.gameObject, UiEntrance.Style.SlideFromRight, 0.05f, 0.35f, 200f);
+            Button left = RoundButton(panel, "LeftArrow", "ui_round_wood", "icon_chev_l", 144f, 80f);
+            Center(left.GetComponent<RectTransform>(), new Vector2(-560f, 40f), new Vector2(144f, 144f));
+            Entrance(left.gameObject, UiEntrance.Style.SlideFromLeft, 0.03f, 0.28f, 160f);
+            Button right = RoundButton(panel, "RightArrow", "ui_round_wood", "icon_chev_r", 144f, 80f);
+            Center(right.GetComponent<RectTransform>(), new Vector2(560f, 40f), new Vector2(144f, 144f));
+            Entrance(right.gameObject, UiEntrance.Style.SlideFromRight, 0.03f, 0.28f, 160f);
 
-            // name plate (bottom left of centre) + SELECT (bottom right of centre): both stay below the miner's feet
+            // ONE centred column under the miner: name + description plate, then the SELECT button: same width, same centre axis
+            const float columnWidth = 600f;
             RectTransform plate = Rect("NamePlate", panel);
-            Place(plate, new Vector2(0.5f, 0f), new Vector2(-330f, 56f), new Vector2(580f, 156f));
+            Place(plate, new Vector2(0.5f, 0f), new Vector2(0f, 36f + TouchUnits + 14f), new Vector2(columnWidth, 128f));
             plate.pivot = new Vector2(0.5f, 0f);
-            Entrance(plate.gameObject, UiEntrance.Style.SlideFromBottom, 0.05f, 0.38f, 200f);
-            Shadow(plate, new Vector2(580f, 156f), new Vector2(0f, 68f - 12f), 0.5f, 34f);
+            Entrance(plate.gameObject, UiEntrance.Style.SlideFromBottom, 0.03f, 0.3f, 160f);
+            Shadow(plate, new Vector2(columnWidth, 128f), new Vector2(0f, 64f - 8f), 0.30f, 34f);
             Image plateBg = Img(plate, "Bg", S("ui_plate"), Color.white);
             Stretch(plateBg.rectTransform);
-            TextMeshProUGUI nameLabel = Text(plate, "Name", "BARNABY", 74f, "UI_Title_Gold", Gold);
-            Place(nameLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -10f), new Vector2(560f, 90f));
+            TextMeshProUGUI nameLabel = Text(plate, "Name", "BARNABY", 70f, "UI_Title_Gold", Gold);
+            Place(nameLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -8f), new Vector2(columnWidth - 40f, 80f));
             nameLabel.rectTransform.pivot = new Vector2(0.5f, 1f);
-            TextMeshProUGUI tagline = Text(plate, "Tagline", "The Bearded Digger", 38f, "UI_Text_Brown", Cream);
-            Place(tagline.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(560f, 50f));
+            TextMeshProUGUI tagline = BodyText(plate, "Tagline", "The Bearded Digger", 32f, Cream, TextAlignmentOptions.Center);
+            Place(tagline.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(columnWidth - 40f, 40f));
             tagline.rectTransform.pivot = new Vector2(0.5f, 0f);
 
-            Button select = TextButton(panel, "SelectButton", "SELECT", ButtonStyle.Gold, new Vector2(560f, 156f), 86f, "icon_check");
+            Button select = TextButton(panel, "SelectButton", "SELECT", ButtonStyle.Gold, new Vector2(columnWidth, TouchUnits), 76f, "icon_check");
             var selectRect = (RectTransform)select.transform;
-            Place(selectRect, new Vector2(0.5f, 0f), new Vector2(330f, 56f), new Vector2(560f, 156f));
+            Place(selectRect, new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(columnWidth, TouchUnits));
             selectRect.pivot = new Vector2(0.5f, 0f);
-            Entrance(select.gameObject, UiEntrance.Style.SlideFromBottom, 0.12f, 0.38f, 200f);
-
-            // EQUIPPED tag on the plate corner
-            RectTransform tag = Rect("EquippedBadge", plate);
-            Place(tag, new Vector2(0f, 1f), new Vector2(20f, 28f), new Vector2(236f, 66f));
-            tag.pivot = new Vector2(0f, 0.5f);
-            Image tagBg = Img(tag, "Bg", S("ui_badge"), Color.white);
-            Stretch(tagBg.rectTransform);
-            Image tagIcon = Img(tag, "Check", S("icon_check"), Color.white, false);
-            Place(tagIcon.rectTransform, new Vector2(0f, 0.5f), new Vector2(34f, 0f), new Vector2(46f, 46f));
-            tagIcon.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            TextMeshProUGUI tagText = Text(tag, "Text", "EQUIPPED", 34f, "UI_Text_Green", Cream);
-            Stretch(tagText.rectTransform, 40f, 4f, 0f, 0f);
+            Entrance(select.gameObject, UiEntrance.Style.SlideFromBottom, 0.08f, 0.3f, 160f);
+            // the label is centred on the whole button; the check mark (shown only on the already selected miner) sits at the left
+            var selectLabelRect = (RectTransform)select.transform.Find("Label");
+            selectLabelRect.offsetMin = new Vector2(70f, 12f);
+            selectLabelRect.offsetMax = new Vector2(-70f, 0f);
+            var checkRect = (RectTransform)select.transform.Find("Icon");
+            checkRect.anchorMin = checkRect.anchorMax = new Vector2(0f, 0.5f);
+            checkRect.pivot = new Vector2(0.5f, 0.5f);
+            checkRect.sizeDelta = new Vector2(70f, 70f);
+            checkRect.anchoredPosition = new Vector2(76f, 4f);
 
             var so = new SerializedObject(controller);
             so.FindProperty("catalog").objectReferenceValue = catalog;
@@ -348,7 +435,7 @@ namespace ItemCollector3D.EditorTools
             so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
             so.FindProperty("taglineLabel").objectReferenceValue = tagline;
             so.FindProperty("selectLabel").objectReferenceValue = select.transform.Find("Label").GetComponent<TMP_Text>();
-            so.FindProperty("equippedBadge").objectReferenceValue = tag.gameObject;
+            so.FindProperty("selectedMark").objectReferenceValue = checkRect.gameObject;
             so.ApplyModifiedPropertiesWithoutUndo();
             // "stage" is wired by the scene builder (it lives in the scene, not in the prefab)
             return panel;

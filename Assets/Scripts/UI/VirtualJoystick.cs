@@ -1,6 +1,7 @@
 using ItemCollector3D.Player;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace ItemCollector3D.UI
 {
@@ -13,6 +14,12 @@ namespace ItemCollector3D.UI
         [SerializeField, Range(0.1f, 1f)] private float handleRange = 0.55f;
         [SerializeField, Range(0f, 0.5f)] private float deadZone = 0.08f;
 
+        [Header("Look (optional)")]
+        [Tooltip("The translucent base: calmer while idle, fully visible while a finger is on the joystick.")]
+        [SerializeField] private Graphic fadeTarget;
+        [SerializeField, Range(0f, 1f)] private float idleAlpha = 0.7f;
+        [SerializeField, Range(0f, 1f)] private float activeAlpha = 1f;
+
         private Canvas parentCanvas;
         private int activePointerId = int.MinValue;
 
@@ -22,6 +29,7 @@ namespace ItemCollector3D.UI
         {
             parentCanvas = GetComponentInParent<Canvas>();
             background ??= transform as RectTransform;
+            SetFade(idleAlpha);
         }
 
         private void OnDisable()
@@ -81,6 +89,7 @@ namespace ItemCollector3D.UI
                 radius.x > 0f ? localPoint.x / radius.x : 0f,
                 radius.y > 0f ? localPoint.y / radius.y : 0f);
 
+            SetFade(activeAlpha);
             Value = Vector2.ClampMagnitude(normalized, 1f);
             if (Value.magnitude < deadZone)
             {
@@ -106,7 +115,20 @@ namespace ItemCollector3D.UI
                 handle.anchoredPosition = Vector2.zero;
             }
 
+            SetFade(idleAlpha);
             playerController?.ClearMoveInput();
+        }
+
+        private void SetFade(float alpha)
+        {
+            if (fadeTarget == null)
+            {
+                return;
+            }
+
+            Color color = fadeTarget.color;
+            color.a = alpha;
+            fadeTarget.color = color;
         }
     }
 }

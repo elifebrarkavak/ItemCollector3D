@@ -102,8 +102,11 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo(SceneNavigator.MainMenuScene));
             Assert.That(Time.timeScale, Is.EqualTo(1f));
 
-            // ---- PLAY -> Gameplay (real scene load, the scene is listed in Build Settings)
+            // ---- PLAY -> Area Selection -> GREEN MINE -> Gameplay (real scene load, the scene is listed in Build Settings)
             Find<Button>("PlayButton").onClick.Invoke();
+            yield return null;
+            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo(SceneNavigator.MainMenuScene), "PLAY opens the Area Selection, not the gameplay scene");
+            Find<Button>("AreaPlay_green_mine").onClick.Invoke();
             yield return WaitForScene(SceneNavigator.GameplayScene);
             TreasureHuntController hunt = Object.FindAnyObjectByType<TreasureHuntController>();
             TreasureSpot coin = Object.FindAnyObjectByType<TreasureSpot>();
@@ -155,8 +158,11 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(new GameSettings(settingsStore).SfxVolume, Is.EqualTo(0.3f).Within(1e-4f), "persisted in the settings store");
             Find<Button>("BackButton").onClick.Invoke();
 
-            // ---- PLAY again: the collected coin is still collected, gold is still 10
+            // ---- PLAY again: the collected coin is still collected, gold is still 10 (and the Area Selection shows it: 10 / 500)
             Find<Button>("PlayButton").onClick.Invoke();
+            yield return null;
+            Assert.That(Find<AreaSelectController>("AreaPanel").GetCard(0).CaptionLabel.text, Is.EqualTo("10 / 500 COLLECTED"), "the Area Selection shows the saved progress");
+            Find<Button>("AreaPlay_green_mine").onClick.Invoke();
             yield return WaitForScene(SceneNavigator.GameplayScene);
             Assert.That(Object.FindAnyObjectByType<TreasureSpot>().State, Is.EqualTo(TreasureState.Collected), "Progress survived the menu round trip.");
             Assert.That(Find<TMP_Text>("GoldText").text, Is.EqualTo("10 / 500 GOLD"));
