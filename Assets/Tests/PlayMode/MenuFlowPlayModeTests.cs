@@ -149,7 +149,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(requested, Is.Null, "PLAY opens the Area Selection: it no longer loads the gameplay scene directly.");
             Assert.That(menu.IsAreaSelectOpen, Is.True);
             Find<Button>("AreaPlay_green_mine").onClick.Invoke();
-            Assert.That(requested, Is.EqualTo(SceneNavigator.GameplayScene), "GREEN MINE (the only open area) opens the existing GameplayTest scene.");
+            Assert.That(requested, Is.EqualTo(SceneNavigator.GreenMineScene), "GREEN MINE (the only open area) opens the GreenMine scene.");
             Find<Button>("AreaBackButton").onClick.Invoke();
             Assert.That(menu.IsAreaSelectOpen, Is.False);
             Assert.That(buttons.gameObject.activeSelf, Is.True, "BACK returns to the Main Menu buttons.");

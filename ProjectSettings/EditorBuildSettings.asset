@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/GameplayTest.unity
     guid: 6e617ed0ae4a94246ba035c131f3b6bf
+  - enabled: 1
+    path: Assets/Scenes/GreenMine.unity
+    guid: 3006012466f914ecdbe82efc678c7f65
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

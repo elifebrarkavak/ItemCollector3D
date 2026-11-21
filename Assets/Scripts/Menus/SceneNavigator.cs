@@ -8,7 +8,8 @@ namespace ItemCollector3D.Menus
     public static class SceneNavigator
     {
         public const string MainMenuScene = "MainMenu";
-        public const string GameplayScene = "GameplayTest";
+        public const string GameplayScene = "GameplayTest"; // the original test scene, kept as a sandbox
+        public const string GreenMineScene = "GreenMine";   // the first real area (Area Selection -> GREEN MINE)
 
         /// <summary>Test hook: when set it receives the scene name instead of a real scene load.</summary>
         public static Action<string> LoadHook;

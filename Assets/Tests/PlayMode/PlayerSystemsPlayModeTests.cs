@@ -115,6 +115,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        [RealisticFrameRate] // unpaced frames (2-4 ms) let the CharacterController resolve against the not-yet-synced test ground: a 1.08 m Y jump, see Docs/KnownIssues.md
         public IEnumerator TwoTouches_JoystickMovesPlayer_WhileRightSwipeRotatesCamera()
         {
             CreateGroundedPlayer(out ThirdPersonPlayerController player, out Transform playerTransform);

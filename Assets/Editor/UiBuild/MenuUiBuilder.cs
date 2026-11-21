@@ -29,6 +29,14 @@ namespace ItemCollector3D.EditorTools
         private const float MenuButtonHeight = TouchUnits;
         private const float MenuGap = 22f;
 
+        // Main Menu vertical layout (see ApplyMainMenuElasticLayout). Reference = the 1080 unit high canvas minus the 5.5 % gesture margin of the SafeAreaRoot,
+        // i.e. a 16:9 screen without notch: there the menu is exactly the authored design. On a screen with a bottom inset (iPhone home indicator) the
+        // safe root is lower, and only the SPACES (top margin, title gap, button gaps, bottom margin) give way; titles and buttons keep their size.
+        private const float MenuTitleTopMargin = 40f;
+        private const float MenuTitleHeight = 210f;
+        private const float MenuBottomMargin = 96f;
+        private const float MenuReferenceSafeHeight = 1080f * (1f - 0.055f);
+
         public static void BuildAll()
         {
             BuildSettings();
@@ -283,6 +291,7 @@ namespace ItemCollector3D.EditorTools
                 Button character = MenuButton(buttons, "CharacterButton", "CHARACTER", ButtonStyle.Wood, ref y, MenuButtonHeight, 54f, "icon_helmet", 62f, 0.07f, false);
                 Button settings = MenuButton(buttons, "SettingsButton", "SETTINGS", ButtonStyle.Wood, ref y, MenuButtonHeight, 54f, "icon_gear", 62f, 0.12f, false);
                 Button exit = MenuButton(buttons, "ExitButton", "EXIT", ButtonStyle.Navy, ref y, MenuButtonHeight, 54f, "icon_exit", 62f, 0.17f, false);
+                ApplyMainMenuElasticLayout(titleRoot, buttons, (RectTransform)play.transform, (RectTransform)character.transform, (RectTransform)settings.transform, (RectTransform)exit.transform);
 
                 // ---- sub screens (hidden until opened): rendered after the buttons so they sit on top
                 var settingsInstance = (GameObject)PrefabUtility.InstantiatePrefab(settingsPrefab, root.transform);
@@ -307,6 +316,85 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "characterPanel", selectController);
                 SetRef(controller, "areaPanel", areaController);
                 PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        /// <summary>
+        /// Anchors-only responsive layout of the Main Menu (no script, nothing animated by code changes). The fixed sizes are the title lockup (210) and the four
+        /// buttons (176 + 3 x 128, never below the 48 dp touch size); everything between them is ELASTIC and shrinks / grows with the height of the safe root:
+        /// top margin 40, title gap, three button gaps of 22 and the bottom margin 96 all scale by s = (H - fixed) / (H0 - fixed), H0 being the reference safe
+        /// height. Every position is linear in H, so it is exactly an anchor fraction plus an offset: at H0 (16:9, no inset) the result equals the previous absolute
+        /// layout, with a bottom inset (iPhone landscape) the spaces compress instead of the PLAY button riding up into the title.
+        /// </summary>
+        private static void ApplyMainMenuElasticLayout(RectTransform titleRoot, RectTransform buttons, RectTransform play, RectTransform character, RectTransform settings, RectTransform exit)
+        {
+            float fixedHeight = MenuTitleHeight + PlayHeight + 3f * MenuButtonHeight;                  // 770
+            float elasticReference = MenuReferenceSafeHeight - fixedHeight;                            // all the spaces at the reference height
+            float columnHeight = PlayHeight + 3f * MenuButtonHeight + 3f * MenuGap;                    // 626 at the reference height
+
+            // title lockup: its top margin is elastic, anchored from the top
+            float topFraction = MenuTitleTopMargin / elasticReference;
+            titleRoot.anchorMin = titleRoot.anchorMax = new Vector2(0.5f, 1f - topFraction);
+            titleRoot.pivot = new Vector2(0.5f, 1f);
+            titleRoot.anchoredPosition = new Vector2(0f, topFraction * fixedHeight);
+            titleRoot.sizeDelta = new Vector2(1300f, MenuTitleHeight);
+
+            // button column container: bottom = bottom margin x s, top = bottom + the four buttons + three gaps x s (stretched vertically)
+            float bottomFraction = MenuBottomMargin / elasticReference;
+            float topEdgeFraction = (MenuBottomMargin + 3f * MenuGap) / elasticReference;
+            float buttonsHeight = PlayHeight + 3f * MenuButtonHeight;
+            buttons.anchorMin = new Vector2(0f, bottomFraction);
+            buttons.anchorMax = new Vector2(0f, topEdgeFraction);
+            buttons.pivot = new Vector2(0f, 0f);
+            buttons.offsetMin = new Vector2(MenuColumnX, -bottomFraction * fixedHeight);
+            buttons.offsetMax = new Vector2(MenuColumnX + MenuColumnWidth, buttonsHeight - topEdgeFraction * fixedHeight);
+
+            // inside the container (height Hc = 560 + 3 gaps): EXIT sits on the bottom, PLAY hangs from the top, the two middle buttons at thirds of Hc,
+            // which keeps all three gaps equal at any Hc
+            float x = MenuColumnWidth * 0.5f;
+            void Put(RectTransform rt, float anchorY, float offsetY, float height)
+            {
+                rt.anchorMin = rt.anchorMax = new Vector2(0f, anchorY);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(x, offsetY);
+                rt.sizeDelta = new Vector2(MenuColumnWidth, height);
+            }
+
+            Put(play, 1f, -PlayHeight * 0.5f, PlayHeight);
+            Put(exit, 0f, MenuButtonHeight * 0.5f, MenuButtonHeight);
+            // centre of SETTINGS from the bottom = 128 + g + 64 with g = (Hc - 560) / 3  ->  Hc / 3 + (192 - 560 / 3)
+            Put(settings, 1f / 3f, MenuButtonHeight * 1.5f - buttonsHeight / 3f, MenuButtonHeight);
+            // centre of CHARACTER from the bottom = 2 x 128 + 2g + 64  ->  2 Hc / 3 + (320 - 2 x 560 / 3)
+            Put(character, 2f / 3f, MenuButtonHeight * 2.5f - 2f * buttonsHeight / 3f, MenuButtonHeight);
+            Debug.Assert(Mathf.Approximately(columnHeight, 626f), "Main Menu column reference height changed: re-check the elastic layout");
+        }
+
+        /// <summary>Applies <see cref="ApplyMainMenuElasticLayout"/> to the EXISTING MainMenuUI prefab in place (no other part of the menu is rebuilt).</summary>
+        public static string PatchMainMenuElasticLayout()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(MainMenuPath);
+            try
+            {
+                RectTransform Find(string name)
+                {
+                    foreach (RectTransform rt in root.GetComponentsInChildren<RectTransform>(true))
+                    {
+                        if (rt.name == name)
+                        {
+                            return rt;
+                        }
+                    }
+
+                    throw new System.InvalidOperationException("MainMenuUI has no '" + name + "'");
+                }
+
+                ApplyMainMenuElasticLayout(Find("TitleRoot"), Find("Buttons"), Find("PlayButton"), Find("CharacterButton"), Find("SettingsButton"), Find("ExitButton"));
+                PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
+                return "MainMenuUI elastic layout applied";
             }
             finally
             {

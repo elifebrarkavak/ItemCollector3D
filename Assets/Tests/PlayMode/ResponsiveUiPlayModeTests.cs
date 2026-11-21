@@ -255,6 +255,87 @@ namespace ItemCollector3D.Tests.PlayMode
             });
         }
 
+        /// <summary>Screens with a notch / home indicator: the safe area is smaller than the screen, so the menu has LESS height than on a plain 16:9 screen.</summary>
+        private static readonly (string name, int width, int height, Rect? safeArea)[] PhoneSafeAreaScreens =
+        {
+            ("16:9, no inset", 1920, 1080, null),
+            ("19.5:9 punch-hole phone (landscape side inset)", 2340, 1080, new Rect(96f, 0f, 2148f, 1080f)),
+            ("21:9, no inset", 2520, 1080, null),
+            ("iPhone 14 Pro landscape (2532x1170, home indicator 63 px)", 2532, 1170, new Rect(141f, 63f, 2250f, 1107f)),
+            ("iPhone 15 Pro Max landscape (2796x1290, 59 pt sides, 21 pt bottom)", 2796, 1290, new Rect(177f, 63f, 2442f, 1227f)),
+        };
+
+        /// <summary>The logo keeps at least this much clear space above PLAY (the same 24 units every other edge keeps).</summary>
+        private const float MinLogoGap = 24f;
+
+        [UnityTest]
+        public IEnumerator MainMenu_LogoClearsPlay_AndTheColumnStaysTidy_OnEveryScreenAlsoWithPhoneSafeAreas()
+        {
+            yield return LoadScene(MainMenuPath);
+            gameView ??= new TestGameView(); // restored by TearDown
+            string[] names = { "PlayButton", "CharacterButton", "SettingsButton", "ExitButton" };
+            foreach ((string name, int width, int height, Rect? safeArea) screen in PhoneSafeAreaScreens)
+            {
+                gameView.SetResolution(screen.width, screen.height);
+                yield return null;
+                yield return null;
+                SafeAreaFitter.SafeAreaOverride = () => screen.safeArea ?? new Rect(0f, 0f, Screen.width, Screen.height);
+                yield return null;
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                Assert.That(new Vector2Int(Screen.width, Screen.height), Is.EqualTo(new Vector2Int(screen.width, screen.height)), $"the Game View did not switch to {screen.name}");
+
+                try
+                {
+                    Rect canvas = CanvasRect((RectTransform)Find<Canvas>("UI Canvas").transform);
+                    var rects = new List<Rect>();
+                    foreach (string button in names)
+                    {
+                        Rect rect = CanvasRect((RectTransform)Find<Button>(button).transform);
+                        Assert.That(rect.height, Is.GreaterThanOrEqualTo(MinTouchUnits), button + " keeps its 48 dp touch size (only the spaces are elastic)");
+                        rects.Add(rect);
+                    }
+
+                    // the logo (title text and the 3D badge) clears PLAY with a real gap: this overlapped by ~3 units with a 63 px home indicator
+                    Rect title = CanvasRect(Find<TMP_Text>("Title").rectTransform);
+                    float gap = title.yMin - rects[0].yMax;
+                    Debug.Log($"MainMenu layout on {screen.name}: logo-to-PLAY gap {gap:F1} units, button gaps {rects[0].yMin - rects[1].yMax:F1} / {rects[1].yMin - rects[2].yMax:F1} / {rects[2].yMin - rects[3].yMax:F1}, EXIT bottom {rects[3].yMin - canvas.yMin:F1} above the canvas edge.");
+                    Assert.That(gap, Is.GreaterThanOrEqualTo(MinLogoGap), $"the logo clears PLAY by {gap:F1} units (needs {MinLogoGap})");
+                    Assert.That(Overlaps(CanvasRect((RectTransform)Find<Transform>("TitleBadge")), rects[0]), Is.False, "the badge clears PLAY");
+
+                    // equal, positive gaps in one column, nothing overlapping
+                    float gap1 = rects[0].yMin - rects[1].yMax, gap2 = rects[1].yMin - rects[2].yMax, gap3 = rects[2].yMin - rects[3].yMax;
+                    Assert.That(Mathf.Min(gap1, Mathf.Min(gap2, gap3)), Is.GreaterThanOrEqualTo(12f), $"the buttons keep a visible gap ({gap1:F1} / {gap2:F1} / {gap3:F1})");
+                    Assert.That(gap3, Is.EqualTo(gap2).Within(0.5f), "equal spacing between the secondary buttons");
+                    Assert.That(gap1, Is.EqualTo(gap2).Within(6f), "and the same gap below PLAY (PLAY breathes by up to 2.5 %)");
+                    for (int i = 1; i < rects.Count; i++)
+                    {
+                        Assert.That(Overlaps(rects[i - 1], rects[i]), Is.False, names[i] + " does not overlap the button above");
+                    }
+
+                    // everything stays inside the safe area minus the gesture margin, and the logo inside the screen
+                    SafeAreaFitter fitter = Find<SafeAreaFitter>("SafeAreaRoot");
+                    Rect allowed = SafeAreaFitter.ShrinkForGestures(SafeAreaFitter.SafeAreaOverride(), fitter.GestureMarginFraction * Screen.height);
+                    foreach (string button in names)
+                    {
+                        Rect px = ScreenRect((RectTransform)Find<Button>(button).transform);
+                        Assert.That(Contains(allowed, px, -1f), Is.True, $"{button} ({px}) stays inside the safe area and gesture margin ({allowed})");
+                    }
+
+                    Assert.That(Contains(canvas, title, 0f), Is.True, "the title is on screen");
+                    Rect badge = ScreenRect((RectTransform)Find<Transform>("TitleBadge"));
+                    Assert.That(badge.yMax, Is.LessThanOrEqualTo(allowed.yMax + 1f), "the logo badge is not cut at the top");
+                }
+                catch (AssertionException e)
+                {
+                    throw new AssertionException($"On {screen.name}: {e.Message}", e);
+                }
+            }
+
+            SafeAreaFitter.SafeAreaOverride = null;
+        }
+
         // ------------------------------------------------------------------ Character Selection
 
         [UnityTest]
