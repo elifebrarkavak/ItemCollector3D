@@ -637,7 +637,8 @@ namespace ItemCollector3D.Tests.PlayMode
             {
                 for (int j = 0; j < WalkGrid.N; j++)
                 {
-                    if (parent[i, j] != null && (Mathf.Abs(i - WalkGrid.Half) > 20 || Mathf.Abs(j - WalkGrid.Half) > 20))
+                    bool mineCorridor = i - WalkGrid.Half > 3 && i - WalkGrid.Half < 10 && j - WalkGrid.Half > 14; // the walkable tunnel behind the open portal
+                    if (parent[i, j] != null && !mineCorridor && (Mathf.Abs(i - WalkGrid.Half) > 20 || Mathf.Abs(j - WalkGrid.Half) > 20))
                     {
                         outside++;
                     }
@@ -887,8 +888,8 @@ namespace ItemCollector3D.Tests.PlayMode
             float nominal = so.FindProperty("distance").floatValue;
             Transform player = Player;
 
-            // the player stands 1.3 m in front of the mine's rock face and the camera orbits to the far side of it
-            Teleport(player, new Vector3(6.3f, 1.2f, 13.2f));
+            // the player stands 1.3 m in front of the mine's rock face (beside the open portal) and the camera orbits to the far side of it
+            Teleport(player, new Vector3(11.6f, 1.2f, 13.2f));
             so.FindProperty("yaw").floatValue = 180f;
             so.FindProperty("pitch").floatValue = 18f;
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -977,17 +978,27 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(materials.Count, Is.LessThan(70), "a small shared material set keeps batching effective");
             Assert.That(transparent, Is.LessThanOrEqualTo(5), "few transparent materials (water, waterfall, glow)");
 
-            // lights: only the sun (no extra dynamic lights)
+            // lights: the sun outdoors; the mine interior adds a handful of shadowless point lights and nothing else
             var lights = new List<Light>();
+            int interiorLights = 0;
             foreach (Light l in All<Light>())
             {
                 if (l.enabled && l.gameObject.activeInHierarchy)
                 {
+                    if (l.transform.IsChildOf(environment.Find("MineInterior")))
+                    {
+                        interiorLights++;
+                        Assert.That(l.type, Is.EqualTo(LightType.Point), l.name);
+                        Assert.That(l.shadows, Is.EqualTo(LightShadows.None), l.name);
+                        continue;
+                    }
+
                     lights.Add(l);
                 }
             }
 
-            Assert.That(lights.Count, Is.EqualTo(1), "one directional light, no point / spot lights: " + string.Join(", ", lights.ConvertAll(l => l.name + "/" + l.type)));
+            Assert.That(interiorLights, Is.LessThanOrEqualTo(8), "a few warm lights inside the mine");
+            Assert.That(lights.Count, Is.EqualTo(1), "one directional light outdoors, no other point / spot lights: " + string.Join(", ", lights.ConvertAll(l => l.name + "/" + l.type)));
             Assert.That(lights[0].type, Is.EqualTo(LightType.Directional));
             Assert.That(RenderSettings.sun, Is.SameAs(lights[0]));
 

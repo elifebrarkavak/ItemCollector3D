@@ -31,8 +31,23 @@ namespace ItemCollector3D.Player
 
         private Vector3 positionVelocity;
         private int activeOrbitTouchId = -1;
+        private float environmentDistanceScale = 1f;
+        private float environmentMinimumDistance;
 
         public Transform Target => target;
+
+        /// <summary>The orbit distance currently in force (the configured distance times the level's scale, e.g. shortened inside the mine).</summary>
+        public float EffectiveDistance => distance * environmentDistanceScale;
+
+        /// <summary>
+        /// Lets a level volume (the mine) shorten the orbit and raise the collision floor so the camera stays inside narrow spaces and keeps the player in
+        /// view. (1, 0) restores the defaults.
+        /// </summary>
+        public void SetEnvironmentLimits(float distanceScale, float minimumDistanceFloor)
+        {
+            environmentDistanceScale = Mathf.Clamp(distanceScale, 0.2f, 1f);
+            environmentMinimumDistance = Mathf.Max(0f, minimumDistanceFloor);
+        }
 
         public void SetTarget(Transform newTarget)
         {
@@ -52,14 +67,40 @@ namespace ItemCollector3D.Player
             Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
             Vector3 pivot = target.position + targetOffset;
             Vector3 cameraDirection = rotation * Vector3.back;
-            float resolvedDistance = ResolveCollisionDistance(pivot, cameraDirection);
+            float resolvedDistance = ResolveCollisionDistance(pivot, cameraDirection, out float freeDistance);
+            if (environmentMinimumDistance > 0f && freeDistance < Mathf.Min(environmentMinimumDistance, EffectiveDistance))
+            {
+                // squeezed between the player and a wall (narrow places such as the mine): swing the camera up and over the player instead of pushing it into the wall
+                float floor = Mathf.Min(environmentMinimumDistance, EffectiveDistance);
+                for (float extra = 15f; extra <= 75f; extra += 15f)
+                {
+                    Vector3 lifted = Quaternion.Euler(Mathf.Min(pitch + extra, 80f), yaw, 0f) * Vector3.back;
+                    float liftedDistance = ResolveCollisionDistance(pivot, lifted, out float liftedFree);
+                    if (liftedFree >= floor)
+                    {
+                        cameraDirection = lifted;
+                        resolvedDistance = liftedDistance;
+                        rotation = Quaternion.LookRotation(-lifted, Vector3.up);
+                        break;
+                    }
+                }
+            }
+
             Vector3 desiredPosition = pivot + cameraDirection * resolvedDistance;
 
-            transform.position = Vector3.SmoothDamp(
+            Vector3 smoothed = Vector3.SmoothDamp(
                 transform.position,
                 desiredPosition,
                 ref positionVelocity,
                 positionSmoothTime);
+            if (environmentMinimumDistance > 0f && IsInsideScenery(smoothed))
+            {
+                // the eased path cut a corner (e.g. a timber post at the mine mouth while the player walks on): jump to the safe position instead
+                smoothed = desiredPosition;
+                positionVelocity = Vector3.zero;
+            }
+
+            transform.position = smoothed;
             transform.rotation = rotation;
         }
 
@@ -122,21 +163,41 @@ namespace ItemCollector3D.Player
             }
         }
 
-        private float ResolveCollisionDistance(Vector3 pivot, Vector3 cameraDirection)
+        private static readonly Collider[] OverlapBuffer = new Collider[8];
+
+        private bool IsInsideScenery(Vector3 position)
         {
+            int count = Physics.OverlapSphereNonAlloc(position, collisionRadius * 0.7f, OverlapBuffer, collisionMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                if (target == null || !OverlapBuffer[i].transform.IsChildOf(target))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private float ResolveCollisionDistance(Vector3 pivot, Vector3 cameraDirection, out float freeDistance)
+        {
+            float maxDistance = EffectiveDistance;
             if (!Physics.SphereCast(
                     pivot,
                     collisionRadius,
                     cameraDirection,
                     out RaycastHit hit,
-                    distance,
+                    maxDistance,
                     collisionMask,
                     QueryTriggerInteraction.Ignore))
             {
-                return distance;
+                freeDistance = maxDistance;
+                return maxDistance;
             }
 
-            return Mathf.Clamp(hit.distance - collisionPadding, minimumDistance, distance);
+            freeDistance = hit.distance - collisionPadding;
+            float floor = Mathf.Min(Mathf.Max(minimumDistance, environmentMinimumDistance), maxDistance);
+            return Mathf.Clamp(freeDistance, floor, maxDistance);
         }
     }
 }
