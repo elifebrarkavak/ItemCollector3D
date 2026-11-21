@@ -15,7 +15,7 @@ using UnityEngine.UI;
 namespace ItemCollector3D.Tests.PlayMode
 {
     /// <summary>
-    /// The whole route with REAL scene loads (no hooks): Main Menu -> PLAY -> Gameplay (collect the coin) -> PAUSE -> SETTINGS -> RESUME
+    /// The whole route with REAL scene loads (no hooks): Main Menu -> PLAY -> GREEN MINE (collect a coin) -> PAUSE -> SETTINGS -> RESUME
     /// -> PAUSE -> MAIN MENU -> PLAY again (the coin stays collected, the setting stays changed).
     /// </summary>
     public sealed class MenuEndToEndPlayModeTests
@@ -75,6 +75,20 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return null;
         }
 
+        private static TreasureSpot FindSpot(string id)
+        {
+            foreach (TreasureSpot spot in TreasureSpot.Active)
+            {
+                if (spot.SpotId == id)
+                {
+                    return spot;
+                }
+            }
+
+            Assert.Fail("Treasure spot not found: " + id);
+            return null;
+        }
+
         private static IEnumerator WaitUnscaled(float seconds)
         {
             float end = Time.unscaledTime + seconds;
@@ -107,9 +121,9 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return null;
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo(SceneNavigator.MainMenuScene), "PLAY opens the Area Selection, not the gameplay scene");
             Find<Button>("AreaPlay_green_mine").onClick.Invoke();
-            yield return WaitForScene(SceneNavigator.GameplayScene);
+            yield return WaitForScene(SceneNavigator.GreenMineScene);
             TreasureHuntController hunt = Object.FindAnyObjectByType<TreasureHuntController>();
-            TreasureSpot coin = Object.FindAnyObjectByType<TreasureSpot>();
+            TreasureSpot coin = FindSpot("green_mine.meadow_01"); // a Gold Coin (10 gold) in the GreenMine meadow
             Assert.That(hunt, Is.Not.Null);
             Assert.That(Find<TMP_Text>("GoldText").text, Is.EqualTo("0 / 500 GOLD"));
             Assert.That(Find<TMP_Text>("LevelTitle").text, Is.EqualTo("GREEN MINE"));
@@ -163,8 +177,8 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return null;
             Assert.That(Find<AreaSelectController>("AreaPanel").GetCard(0).CaptionLabel.text, Is.EqualTo("10 / 500 COLLECTED"), "the Area Selection shows the saved progress");
             Find<Button>("AreaPlay_green_mine").onClick.Invoke();
-            yield return WaitForScene(SceneNavigator.GameplayScene);
-            Assert.That(Object.FindAnyObjectByType<TreasureSpot>().State, Is.EqualTo(TreasureState.Collected), "Progress survived the menu round trip.");
+            yield return WaitForScene(SceneNavigator.GreenMineScene);
+            Assert.That(FindSpot("green_mine.meadow_01").State, Is.EqualTo(TreasureState.Collected), "Progress survived the menu round trip.");
             Assert.That(Find<TMP_Text>("GoldText").text, Is.EqualTo("10 / 500 GOLD"));
         }
     }

@@ -28,6 +28,9 @@ MonoBehaviour:
   - m_enabled: 1
     m_path: Assets/Scenes/GameplayTest.unity
     m_guid: 6e617ed0ae4a94246ba035c131f3b6bf
+  - m_enabled: 1
+    m_path: Assets/Scenes/GreenMine.unity
+    m_guid: 3006012466f914ecdbe82efc678c7f65
   m_HasScriptingDefines: 0
   m_ScriptingDefines: []
   m_PlayerSettingsYaml:

@@ -29,6 +29,7 @@ namespace ItemCollector3D.EditorTools
         {
             "Assets/Scenes/MainMenu.unity",
             "Assets/Scenes/GameplayTest.unity",
+            "Assets/Scenes/GreenMine.unity",
         };
 
         // ================================================================ player settings
@@ -93,7 +94,7 @@ namespace ItemCollector3D.EditorTools
 
         // ================================================================ build profile
 
-        /// <summary>Creates the iOS Build Profile asset (once) and gives it the two game scenes. Needs the iOS module to be loaded by the Editor.</summary>
+        /// <summary>Creates the iOS Build Profile asset (once) and gives it the game scenes (menu, the GameplayTest sandbox and Green Mine). Needs the iOS module to be loaded by the Editor.</summary>
         public static string EnsureBuildProfile()
         {
             BuildProfile profile = BuildProfile.GetBuildProfileAtPath(ProfilePath);

@@ -231,7 +231,7 @@ namespace ItemCollector3D.Tests.PlayMode
                     service.RegisterCollected("t", row.gold);
                 }
 
-                Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GameplayScene).Availability, Is.EqualTo(row.green), $"green_mine at {row.gold}");
+                Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene).Availability, Is.EqualTo(row.green), $"green_mine at {row.gold}");
                 Assert.That(AreaSelectController.Evaluate(service, "rocky_canyon", "").Availability, Is.EqualTo(row.rocky), $"rocky_canyon at {row.gold}");
                 Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").Availability, Is.EqualTo(row.ancient), $"ancient_mine at {row.gold}");
 
@@ -249,7 +249,7 @@ namespace ItemCollector3D.Tests.PlayMode
             ProgressService service = ProgressService.Create(areas, new MemoryProgressStore());
             service.RegisterCollected("t", 120);
 
-            AreaCardState green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GameplayScene);
+            AreaCardState green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene);
             Assert.That(green.GoldText, Is.EqualTo("GOAL: 500 GOLD"), "Green Mine shows its goal");
             Assert.That(green.CaptionText, Is.EqualTo("120 / 500 COLLECTED"));
             Assert.That(green.Progress01, Is.EqualTo(0.24f).Within(1e-4f));
@@ -266,7 +266,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(ancient.CaptionText, Is.EqualTo("TOTAL GOLD: 120 / 1200"));
 
             service.RegisterCollected("u", 400); // 520 total: Green Mine complete, Rocky Canyon open
-            green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GameplayScene);
+            green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene);
             Assert.That(green.GoldText, Is.EqualTo("GOAL: 500 GOLD"));
             Assert.That(green.CaptionText, Is.EqualTo("GOAL COMPLETE"), "never more than the goal is counted");
             rocky = AreaSelectController.Evaluate(service, "rocky_canyon", "");
@@ -291,7 +291,7 @@ namespace ItemCollector3D.Tests.PlayMode
             ProgressService service = ProgressService.Create(custom, new MemoryProgressStore());
             service.RegisterCollected("t", 120);
 
-            Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GameplayScene).GoldText, Is.EqualTo("GOAL: 300 GOLD"));
+            Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene).GoldText, Is.EqualTo("GOAL: 300 GOLD"));
             Assert.That(AreaSelectController.Evaluate(service, "rocky_canyon", "").GoldText, Is.EqualTo("180 GOLD TO UNLOCK"), "300 - 120");
             Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").GoldText, Is.EqualTo("680 GOLD TO UNLOCK"), "800 - 120");
 
@@ -409,7 +409,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator GreenMine_Play_LoadsTheGameplayScene_AndKeepsTheChosenMiner()
+        public IEnumerator GreenMine_Play_LoadsTheGreenMineScene_AndKeepsTheChosenMiner()
         {
             CharacterSelection.Select(CharacterSelection.FemaleId); // Ruby
             yield return OpenAreaSelection(0);
@@ -421,12 +421,12 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(green.PlayButton.GetComponentInChildren<TMP_Text>().text, Is.EqualTo("PLAY"));
 
             green.PlayButton.onClick.Invoke();
-            Assert.That(requested, Is.EqualTo(SceneNavigator.GameplayScene), "GREEN MINE enters the existing GameplayTest scene");
+            Assert.That(requested, Is.EqualTo(SceneNavigator.GreenMineScene), "GREEN MINE enters the GreenMine scene (GameplayTest stays a test sandbox)");
             Assert.That(CharacterSelection.SelectedId, Is.EqualTo(CharacterSelection.FemaleId), "the chosen miner is untouched");
 
             requested = null;
             Assert.That(screen.TryEnter("green_mine"), Is.EqualTo(AreaEnterResult.Entered));
-            Assert.That(requested, Is.EqualTo(SceneNavigator.GameplayScene));
+            Assert.That(requested, Is.EqualTo(SceneNavigator.GreenMineScene));
         }
 
         // ------------------------------------------------------------------ open / locked / coming soon
