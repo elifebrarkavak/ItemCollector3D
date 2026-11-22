@@ -1,3 +1,4 @@
+using ItemCollector3D.Characters;
 using UnityEngine;
 
 namespace ItemCollector3D.Treasure
@@ -5,9 +6,11 @@ namespace ItemCollector3D.Treasure
     /// <summary>
     /// Short dig motion for the player, applied ONLY to a visual child (never to the player root), so the real
     /// Transform, the CharacterController and the camera follow are untouched. The motion is a placeholder for the
-    /// capsule (forward tilt + dip + squash, two strokes). To use a real miner later, assign an <see cref="Animator"/>
-    /// (plus trigger name) and/or point <c>visual</c> at the miner model: the procedural motion is skipped when an
-    /// Animator is assigned. The visual returns exactly to its rest pose when the dig ends or the component is disabled.
+    /// body (forward tilt + dip + squash, two strokes) and, on the miner model (Barnaby / Ruby), the arms and the pickaxe
+    /// (<see cref="MinerAnimator.SetDigPose"/>: wind-up, chop at each stroke impact, back to rest) so the dig reads clearly from the
+    /// camera behind the player. The chop lands exactly at the stroke impact ((k + 0.5) / strokes), the moment the dig sound plays.
+    /// To use a real Animator instead, assign it (plus trigger name): the procedural motion is skipped then.
+    /// The visual and the arms return exactly to their rest pose when the dig ends, is cancelled or the component is disabled.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PlayerDigAnimator : MonoBehaviour
@@ -30,6 +33,7 @@ namespace ItemCollector3D.Treasure
         private Quaternion restRotation;
         private Vector3 restScale;
         private bool restCaptured;
+        private MinerAnimator miner;
         private float elapsed;
         private float duration;
 
@@ -88,6 +92,11 @@ namespace ItemCollector3D.Treasure
             CaptureRest();
             elapsed = 0f;
             duration = seconds;
+            if (miner == null && visual != null)
+            {
+                miner = visual.GetComponentInChildren<MinerAnimator>(true);
+            }
+
             IsPlaying = true;
             PlayCount++;
             MaxVisualOffset = 0f;
@@ -140,6 +149,12 @@ namespace ItemCollector3D.Treasure
             visual.localRotation = restRotation * Quaternion.Euler(tilt, 0f, roll);
             visual.localPosition = restPosition + Vector3.down * (dipDistance * s);
             visual.localScale = Vector3.Scale(restScale, new Vector3(1f + squash * 0.5f * s, 1f - squash * s, 1f + squash * 0.5f * s));
+            if (miner != null)
+            {
+                // arms: in over the first tenth of the dig, out over the last tenth; the chop follows the stroke curve (1 at each impact)
+                float weight = Mathf.SmoothStep(0f, 1f, t / 0.1f) * (1f - Mathf.SmoothStep(0f, 1f, (t - 0.88f) / 0.12f));
+                miner.SetDigPose(s * s, weight);
+            }
 
             MaxTiltApplied = Mathf.Max(MaxTiltApplied, tilt);
             MaxVisualOffset = Mathf.Max(MaxVisualOffset, (visual.localPosition - restPosition).magnitude);
@@ -148,6 +163,11 @@ namespace ItemCollector3D.Treasure
         private void Stop()
         {
             IsPlaying = false;
+            if (miner != null)
+            {
+                miner.ClearDigPose();
+            }
+
             if (visual != null && restCaptured)
             {
                 visual.localPosition = restPosition;

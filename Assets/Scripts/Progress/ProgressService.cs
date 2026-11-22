@@ -172,6 +172,38 @@ namespace ItemCollector3D.Progress
             Changed?.Invoke();
         }
 
+        /// <summary>
+        /// NEW GAME: replaces the saved progress with a fresh start (0 gold, no collected treasure, only the first area unlocked, nothing completed).
+        /// The fresh data is WRITTEN first (the store writes atomically); only when that succeeded is the in-memory state replaced, so a failed
+        /// write leaves both the old save and the running game exactly as they were. Raises no area events. Settings and the chosen miner live
+        /// elsewhere and are not touched.
+        /// </summary>
+        /// <returns>true if the new game was saved and applied; false if nothing was changed.</returns>
+        public bool StartNewGame()
+        {
+            GameProgressData fresh = NewData();
+            bool written;
+            try
+            {
+                written = store.Write(JsonUtility.ToJson(fresh));
+            }
+            catch (Exception exception)
+            {
+                ProgressLog.Warning("NEW GAME could not be saved: " + exception.Message);
+                return false;
+            }
+
+            if (!written)
+            {
+                ProgressLog.Warning("NEW GAME could not be saved: the progress was left unchanged.");
+                return false;
+            }
+
+            ApplyData(fresh);
+            Changed?.Invoke();
+            return true;
+        }
+
         // ------------------------------------------------------------------ loading
 
         private void Load()

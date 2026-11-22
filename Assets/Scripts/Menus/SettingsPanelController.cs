@@ -1,4 +1,5 @@
 using System;
+using ItemCollector3D.Progress;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,9 @@ namespace ItemCollector3D.Menus
     /// <summary>
     /// The ONE settings panel, used by both the Main Menu and the Pause Menu (same prefab). Three sliders write straight into
     /// <see cref="GameSettings"/> (saved to PlayerPrefs on every change) and the sliders show the stored values when the panel opens.
+    /// In the Main Menu only (<see cref="NewGameAvailable"/>) a NEW GAME button asks "START A NEW GAME?"; CANCEL changes nothing, START NEW GAME
+    /// calls <see cref="ProgressService.StartNewGame"/> on the menu's own progress service (the one the Area Selection reads), which saves the
+    /// fresh progress first. Settings (volumes, camera) and the chosen miner are never touched.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class SettingsPanelController : MonoBehaviour
@@ -21,6 +25,35 @@ namespace ItemCollector3D.Menus
         [SerializeField] private Button backButton;
         [SerializeField] private Button closeButton;
 
+        [Header("NEW GAME (shown in the Main Menu only)")]
+        [SerializeField] private Button newGameButton;
+        [SerializeField] private GameObject newGameDialog;
+        [SerializeField] private TMP_Text newGameTitle;
+        [SerializeField] private TMP_Text newGameBody;
+        [SerializeField] private Button cancelNewGameButton;
+        [SerializeField] private Button confirmNewGameButton;
+        [Tooltip("Empty = the scene's ProgressManager (the one the Area Selection uses).")]
+        [SerializeField] private ProgressManager progress;
+
+        public const string ConfirmTitle = "START A NEW GAME?";
+        public const string ConfirmBody = "Your gold, collected treasures and area progress will be reset. This cannot be undone.";
+        public const string DoneTitle = "NEW GAME STARTED";
+        public const string DoneBody = "Your progress was reset. Good luck in Green Mine!";
+        public const string ErrorTitle = "COULD NOT START";
+        public const string ErrorBody = "Your save could not be changed. Nothing was reset.";
+
+        /// <summary>Horizontal distance of BACK and NEW GAME from the centre when they stand side by side.</summary>
+        public const float ButtonPairOffset = 290f;
+
+        public enum NewGameState
+        {
+            Closed,
+            Confirm,
+            Done,
+            Failed,
+        }
+
+        private bool newGameAvailable;
         private bool listenersAdded;
         private bool refreshing; // changing a slider's min/max clamps its value and fires onValueChanged: ignore that
 
@@ -28,6 +61,29 @@ namespace ItemCollector3D.Menus
         public Slider SfxSlider => sfxSlider;
         public Slider CameraSlider => cameraSlider;
         public bool IsOpen => gameObject.activeSelf;
+
+        public Button NewGameButton => newGameButton;
+        public Button CancelNewGameButton => cancelNewGameButton;
+        public Button ConfirmNewGameButton => confirmNewGameButton;
+        public GameObject NewGameDialog => newGameDialog;
+        public NewGameState DialogState { get; private set; }
+        public bool IsNewGameDialogOpen => DialogState != NewGameState.Closed;
+        public string DialogTitle => newGameTitle != null ? newGameTitle.text : string.Empty;
+        public string DialogBody => newGameBody != null ? newGameBody.text : string.Empty;
+
+        /// <summary>Whether the NEW GAME button exists in this panel (the Main Menu turns it on; the Pause Menu never does).</summary>
+        public bool NewGameAvailable
+        {
+            get => newGameAvailable;
+            set
+            {
+                newGameAvailable = value;
+                ApplyNewGameLayout();
+            }
+        }
+
+        /// <summary>Raised after START NEW GAME saved the fresh progress.</summary>
+        public event Action NewGameStarted;
 
         /// <summary>Raised when the player presses BACK (the owner decides what to show next).</summary>
         public event Action Closed;
@@ -41,6 +97,8 @@ namespace ItemCollector3D.Menus
         {
             EnsureListeners();
             Refresh();
+            ApplyNewGameLayout();
+            CloseNewGameDialog();
         }
 
         public void Show()
@@ -51,6 +109,7 @@ namespace ItemCollector3D.Menus
 
         public void Hide()
         {
+            CloseNewGameDialog();
             gameObject.SetActive(false);
         }
 
@@ -127,12 +186,163 @@ namespace ItemCollector3D.Menus
             {
                 closeButton.onClick.AddListener(Close);
             }
+
+            if (newGameButton != null)
+            {
+                newGameButton.onClick.AddListener(OpenNewGameDialog);
+            }
+
+            if (cancelNewGameButton != null)
+            {
+                cancelNewGameButton.onClick.AddListener(CancelNewGame);
+            }
+
+            if (confirmNewGameButton != null)
+            {
+                confirmNewGameButton.onClick.AddListener(ConfirmNewGame);
+            }
         }
 
         public void Close()
         {
+            if (IsNewGameDialogOpen)
+            {
+                CloseNewGameDialog(); // Escape / Back with the question open only closes the question
+                return;
+            }
+
             Hide();
             Closed?.Invoke();
+        }
+
+        // ------------------------------------------------------------------ NEW GAME
+
+        private void ApplyNewGameLayout()
+        {
+            if (newGameButton != null)
+            {
+                newGameButton.gameObject.SetActive(newGameAvailable);
+                var rect = (RectTransform)newGameButton.transform;
+                rect.anchoredPosition = new Vector2(ButtonPairOffset, rect.anchoredPosition.y);
+            }
+
+            if (backButton != null)
+            {
+                var rect = (RectTransform)backButton.transform;
+                rect.anchoredPosition = new Vector2(newGameAvailable && newGameButton != null ? -ButtonPairOffset : 0f, rect.anchoredPosition.y);
+            }
+        }
+
+        /// <summary>NEW GAME pressed: only asks. Nothing is changed.</summary>
+        public void OpenNewGameDialog()
+        {
+            if (!newGameAvailable || newGameDialog == null)
+            {
+                return;
+            }
+
+            ShowDialog(NewGameState.Confirm);
+        }
+
+        /// <summary>CANCEL: closes the question; no data is touched.</summary>
+        public void CancelNewGame()
+        {
+            CloseNewGameDialog();
+        }
+
+        /// <summary>START NEW GAME (or OK once the result is shown).</summary>
+        public void ConfirmNewGame()
+        {
+            switch (DialogState)
+            {
+                case NewGameState.Confirm:
+                    // one step at a time: the state leaves Confirm before anything runs, so a double tap cannot reset twice
+                    ProgressService service = ResolveService();
+                    bool ok = service != null && service.StartNewGame();
+                    ShowDialog(ok ? NewGameState.Done : NewGameState.Failed);
+                    if (ok)
+                    {
+                        NewGameStarted?.Invoke();
+                    }
+
+                    break;
+                case NewGameState.Done:
+                case NewGameState.Failed:
+                    CloseNewGameDialog();
+                    break;
+            }
+        }
+
+        private ProgressService ResolveService()
+        {
+            if (progress == null)
+            {
+                progress = FindAnyObjectByType<ProgressManager>();
+            }
+
+            if (progress == null)
+            {
+                return null;
+            }
+
+            progress.Initialize();
+            return progress.Service;
+        }
+
+        private void ShowDialog(NewGameState state)
+        {
+            DialogState = state;
+            if (newGameDialog != null)
+            {
+                newGameDialog.SetActive(state != NewGameState.Closed);
+            }
+
+            if (newGameTitle != null)
+            {
+                newGameTitle.text = state switch
+                {
+                    NewGameState.Done => DoneTitle,
+                    NewGameState.Failed => ErrorTitle,
+                    _ => ConfirmTitle,
+                };
+            }
+
+            if (newGameBody != null)
+            {
+                newGameBody.text = state switch
+                {
+                    NewGameState.Done => DoneBody,
+                    NewGameState.Failed => ErrorBody,
+                    _ => ConfirmBody,
+                };
+            }
+
+            bool confirming = state == NewGameState.Confirm;
+            if (cancelNewGameButton != null)
+            {
+                cancelNewGameButton.gameObject.SetActive(confirming);
+            }
+
+            if (confirmNewGameButton != null)
+            {
+                TMP_Text label = confirmNewGameButton.GetComponentInChildren<TMP_Text>(true);
+                if (label != null)
+                {
+                    label.text = confirming ? "START NEW GAME" : "OK";
+                }
+
+                var rect = (RectTransform)confirmNewGameButton.transform;
+                rect.anchoredPosition = new Vector2(confirming ? ButtonPairOffset : 0f, rect.anchoredPosition.y);
+            }
+        }
+
+        private void CloseNewGameDialog()
+        {
+            DialogState = NewGameState.Closed;
+            if (newGameDialog != null)
+            {
+                newGameDialog.SetActive(false);
+            }
         }
 
         private void RefreshLabels()

@@ -58,6 +58,7 @@ namespace ItemCollector3D.Menus
 
             if (settingsPanel != null)
             {
+                settingsPanel.NewGameAvailable = true; // the NEW GAME button lives in the Main Menu's Settings only
                 settingsPanel.Closed += ShowHome;
                 settingsPanel.Hide();
             }

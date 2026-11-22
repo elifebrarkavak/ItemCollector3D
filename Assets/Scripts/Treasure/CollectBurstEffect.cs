@@ -38,6 +38,9 @@ namespace ItemCollector3D.Treasure
         public float GlowLightIntensity => glowLight != null && glowLight.enabled ? glowLight.intensity : 0f;
         public int MaxParticles => maxParticles;
 
+        /// <summary>The (cheap, shared) particle material, also used by the Epic treasure sparkles.</summary>
+        public Material ParticleMaterial => particleMaterial;
+
         public int ParticleCountFor(float intensity)
         {
             return Mathf.RoundToInt(Mathf.Lerp(minParticles, maxParticles, Mathf.Clamp01(intensity)));
