@@ -188,7 +188,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
                     ground = Color.Lerp(new Color(0.94f, 0.85f, 0.65f), new Color(0.86f, 0.72f, 0.51f), Mathf.Clamp01(1f - floor / 1.6f) * 0.7f);
                     ground = Color.Lerp(ground, new Color(0.80f, 0.66f, 0.47f), Mathf.Clamp01(Mathf.Sin(x * 1.7f + n1 * 9f + z * 0.6f) * 0.5f + 0.5f) * 0.28f); // wind ripples
                     ground = Color.Lerp(ground, speck > 0.5f ? new Color(0.58f, 0.48f, 0.40f) : new Color(0.95f, 0.89f, 0.78f), n2 > 0.58f ? 0.5f : 0f); // pebbles
-                    ground = Color.Lerp(ground, new Color(0.78f, 0.62f, 0.44f), Ss(2.4f, 0.4f, TrailDistance("Riverbed", x, z) + 1.2f * (n1 - 0.5f)) * 0.5f); // the old channel: darker, packed sand
+                    ground = Color.Lerp(ground, new Color(0.78f, 0.62f, 0.44f), Ss(2.4f, 0.4f, TrailDistance("Riverbed", x, z) + 1.2f * (n1 - 0.5f)) * 0.62f); // the old channel: darker, packed sand (15D: a little stronger so the way reads from a distance)
                     break;
                 case RcZone.Railway:
                     ground = Color.Lerp(new Color(0.76f, 0.62f, 0.46f), new Color(0.66f, 0.52f, 0.39f), n2);
@@ -196,7 +196,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
                     break;
                 case RcZone.Overlook:
                     ground = Color.Lerp(new Color(0.96f, 0.85f, 0.60f), new Color(0.91f, 0.76f, 0.52f), n1);
-                    ground = Color.Lerp(ground, new Color(0.80f, 0.62f, 0.42f), Ss(0.9f, 0.1f, TrailDistance("OverlookPath", x, z)) * 0.55f); // the worn path
+                    ground = Color.Lerp(ground, new Color(0.80f, 0.62f, 0.42f), Ss(0.9f, 0.1f, TrailDistance("OverlookPath", x, z)) * 0.66f); // the worn path (15D: a little stronger)
                     break;
                 case RcZone.Ravine:
                     ground = Color.Lerp(new Color(0.94f, 0.74f, 0.45f), new Color(0.88f, 0.62f, 0.36f), n1);
@@ -216,7 +216,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             float tone = Mathf.Clamp01(0.42f * Hash01(layer, 3, 13) + 0.45f * Mathf.Clamp01(height / 20f) + 0.13f * n2 + ZoneTone(near));
             Color rock = Strata[Mathf.Clamp(Mathf.FloorToInt(tone * Strata.Length), 0, Strata.Length - 1)];
             float shadowLine = Ss(0.26f, 0.0f, above);
-            rock = Color.Lerp(rock, rock * 0.72f, shadowLine * 0.85f);
+            rock = Color.Lerp(rock, rock * 0.66f, shadowLine * 0.85f); // 15D: the dark line under each strata layer a little deeper, so the red layers separate better
             float streak = Mathf.PerlinNoise((x + z) * 2.6f + 3f, (x - z) * 0.35f + 7f);
             rock *= Mathf.Lerp(0.86f, 1.06f, streak);
             rock *= Mathf.Lerp(0.95f, 1.04f, n3);
