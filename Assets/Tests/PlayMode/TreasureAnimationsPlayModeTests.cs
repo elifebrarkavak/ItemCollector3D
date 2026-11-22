@@ -315,7 +315,8 @@ namespace ItemCollector3D.Tests.PlayMode
                 Teleport(Player, PlaceAtDistance(spot, spot.Definition.DigRadius + 3f)); // the player walks away
                 yield return null;
                 yield return null;
-                yield return new WaitForSecondsRealtime(0.1f);
+                // the teleport above looks like a sprint to the walk animation (it measures the model's speed): let that settle before comparing the arms
+                yield return new WaitForSecondsRealtime(0.5f);
                 Assert.That(digger.IsPlaying, Is.False, id + ": the dig motion ended");
                 Assert.That(digger.CancelCount, Is.EqualTo(1), id);
                 AssertMinerAtRest(miner, id + " after the cancel");
