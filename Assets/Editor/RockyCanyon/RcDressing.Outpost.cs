@@ -305,7 +305,8 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
 
             rm.Pipe(new Vector3(-1.0f, leg + 0.35f, -0.9f), new Vector3(-1.25f, leg - 0.55f, -1.5f), 0.07f, 5, P.Iron);
             rm.Pop();
-            Box(cols, "WaterTowerBase", pos + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 1.9f, 0f), new Vector3(3.1f, 3.8f, 3.1f), yaw);
+            // only the lower 2 m of the legs block the miner: a taller collider beside the camp paths would squeeze the orbiting camera (its ray starts 2.45 m above the feet)
+            Box(cols, "WaterTowerBase", pos + Quaternion.Euler(0f, yaw, 0f) * new Vector3(0f, 1.0f, 0f), new Vector3(3.1f, 2.0f, 3.1f), yaw);
         }
 
         // ------------------------------------------------------------------ the mining company's sign at the way out

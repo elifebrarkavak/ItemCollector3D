@@ -405,7 +405,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(Physics.Linecast(camera.transform.position, player.position + Vector3.up * 1.4f, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore) && hit.collider.transform.root != player,
                     Is.False, id + ": nothing between the camera and the miner");
                 Assert.That(FindButton("DigButton").gameObject.activeInHierarchy, Is.False, "DIG stays hidden until a treasure is in range");
-                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(0), "no treasure yet: the test points are not part of the game");
+                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(20), "the 20 permanent treasures (stage 15C) are all in play");
 
                 yield return SceneManager.UnloadSceneAsync(scene);
                 scene = default;
@@ -731,22 +731,17 @@ namespace ItemCollector3D.Tests.PlayMode
             {
                 CharacterSelection.Select(id);
                 yield return Load(ScenePath, FinishedGreenMineSave);
-                Transform tests = RootObject("TreasureSpots").transform.Find("_TestPoints");
-                Assert.That(tests, Is.Not.Null);
-                Assert.That(tests.gameObject.activeSelf, Is.False, "the test points are switched off in the shipped scene");
-                tests.gameObject.SetActive(true);
-                yield return null;
-
+                Assert.That(RootObject("TreasureSpots").transform.Find("_TestPoints"), Is.Null, "the 15A scaffolding is gone: the real treasures are used");
                 var hunt = One<TreasureHuntController>();
                 var detector = One<TreasureDetector>();
                 Transform player = RootObject("Player").transform;
-                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(2));
+                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(20));
                 TreasureSpot spot = null;
                 foreach (TreasureSpot s in TreasureSpot.Active)
                 {
                     Assert.That(s.SpotId, Does.StartWith("rocky_canyon."), "Rocky Canyon ids never clash with Green Mine's");
                     Assert.That(s.SpotId, Does.Not.StartWith("green_mine."));
-                    if (s.SpotId == "rocky_canyon.test_a")
+                    if (s.SpotId == "rocky_canyon.outpost_01")
                     {
                         spot = s;
                     }
@@ -754,6 +749,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
                 Assert.That(spot, Is.Not.Null);
                 Assert.That(spot.Definition, Is.Not.Null, "an existing TreasureDefinition (the Gold Coin)");
+                Assert.That(spot.Definition.GoldValue, Is.EqualTo(10));
                 Teleport(player, new Vector3(spot.transform.position.x + 6f, TerrainHeight(spot.transform.position.x + 6f, spot.transform.position.z) + 1.05f, spot.transform.position.z));
                 yield return new WaitForSecondsRealtime(0.8f);
                 Assert.That(detector.HasSignal, Is.True, id + ": the detector senses the treasure");
@@ -779,7 +775,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(hunt.TotalGold, Is.EqualTo(gold + spot.Definition.GoldValue), id + ": once");
 
                 GameProgressData saved = JsonUtility.FromJson<GameProgressData>(store.Json);
-                Assert.That(saved.collectedTreasureIds, Contains.Item("rocky_canyon.test_a"));
+                Assert.That(saved.collectedTreasureIds, Contains.Item("rocky_canyon.outpost_01"));
                 Assert.That(saved.collectedTreasureIds.Count, Is.EqualTo(13), "the 12 Green Mine ids are all still there, plus the new one");
                 foreach (string green in new[] { "green_mine.meadow_01", "green_mine.mine_room_01", "green_mine.bridge_01" })
                 {

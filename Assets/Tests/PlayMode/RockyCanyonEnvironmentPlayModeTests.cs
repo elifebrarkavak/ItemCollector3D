@@ -335,7 +335,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator FiveAreas_HaveTheirLandmarksAndCollidersAndNoTreasureWasAdded()
+        public IEnumerator FiveAreas_HaveTheirLandmarksAndColliders_AndTheTwentyTreasures()
         {
             yield return Load();
             Transform env = Env;
@@ -379,17 +379,18 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(glow, Is.Not.Null);
             Assert.That(Vector2.Distance(new Vector2(glow.position.x, glow.position.z), new Vector2(-17f, 2f)), Is.LessThan(1f), "the light is over the pocket");
 
-            // treasure: nothing collectable yet (15C); the two inactive test points of 15A are still the only spots
-            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(0));
+            // treasure (15C): the 20 permanent treasures live in the zone groups; the 15A scaffolding is gone
+            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(20));
+            Assert.That(RootObject("TreasureSpots").transform.Find("_TestPoints"), Is.Null);
             int spots = 0;
             foreach (TreasureSpot s in RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true))
             {
                 spots++;
-                Assert.That(s.SpotId, Does.StartWith("rocky_canyon.test_"));
-                Assert.That(s.gameObject.activeInHierarchy, Is.False, "test points stay inactive");
+                Assert.That(s.SpotId, Does.StartWith("rocky_canyon."));
+                Assert.That(s.SpotId, Does.Not.Contain("test_"));
             }
 
-            Assert.That(spots, Is.EqualTo(2));
+            Assert.That(spots, Is.EqualTo(20));
         }
 
         private static int CountNamed(Transform parent, string prefix)

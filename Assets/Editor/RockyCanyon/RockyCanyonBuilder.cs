@@ -223,7 +223,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             BuildLighting(env.transform);
             BuildSpawnMarker(env.transform);
 
-            // ---- treasures: a separate root with one (empty) group per area, plus two INACTIVE test points that are not part of the game
+            // ---- treasures: a separate root with one group per area, filled by RcTreasures (stage 15C)
             BuildTreasureRoot(scene);
             RcDressing.DressAll(false);
         }
@@ -281,23 +281,8 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
                 Child(root.transform, zone);
             }
 
-            // two TEST points (the existing treasure prefabs, so they can be checked here); the group is inactive: they are not part of the game and pay no gold
-            Transform tests = Child(root.transform, "_TestPoints");
-            AddTestSpot(tests, "Treasure_test_a", "Assets/Prefabs/Treasure/Treasure_GoldCoin.prefab", "rocky_canyon.test_a", OnGround(-29f, -22f));
-            AddTestSpot(tests, "Treasure_test_b", "Assets/Prefabs/Treasure/Treasure_GoldBar.prefab", "rocky_canyon.test_b", OnGround(8f, -10f));
-            tests.gameObject.SetActive(false);
-        }
-
-        private static void AddTestSpot(Transform parent, string name, string prefabPath, string id, Vector3 position)
-        {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
-            instance.name = name;
-            instance.transform.position = position;
-            var spot = instance.GetComponent<ItemCollector3D.Treasure.TreasureSpot>();
-            var so = new SerializedObject(spot);
-            so.FindProperty("spotId").stringValue = id;
-            so.ApplyModifiedPropertiesWithoutUndo();
+            // the 20 permanent treasures (stage 15C) go into those groups
+            RcTreasures.PlaceAll(scene);
         }
 
         // ================================================================ report

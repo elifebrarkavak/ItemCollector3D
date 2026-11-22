@@ -9,7 +9,7 @@ namespace ItemCollector3D.Audio
     /// cross-fading their own tail into their head. Whether it sounds pleasant on a device is NOT verified by code, only the measurable
     /// properties (length, peak, silence at both ends, loop seam) are, see GameAudioPlayModeTests.
     /// </summary>
-    public static class SoundSynth
+    public static partial class SoundSynth
     {
         public const int SfxRate = 44100;
         public const int AmbienceRate = 22050;

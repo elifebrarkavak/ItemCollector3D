@@ -265,6 +265,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
 
             Vector2 backWall = Snap(-21.0f, 3.0f, -0.5f, 2f);
             Outcrop(rm, At(backWall.x, backWall.y), 1.5f, 3.2f, 3, false, 1);
+            Ball(cols, "PocketOutcrop", At(backWall.x, backWall.y, 0.8f), 1.3f); // 15D: the rock mass at the pocket's back wall used to be walk-through (a low collider, like the other tall props)
             LanternPost(rm, At(-15.2f, 4.4f), 200f, 1.5f);
             var lightGo = new GameObject("PocketGlow");
             lightGo.transform.SetParent(props, false);
