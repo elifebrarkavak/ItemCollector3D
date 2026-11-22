@@ -14,6 +14,8 @@ namespace ItemCollector3D.Treasure
 
     /// <summary>
     /// A single buried treasure. State only moves forward: Hidden -> Revealed -> Collected.
+    /// The visual rises out of the ground on reveal and plays a short collect animation (see <see cref="TreasureVisualAnimator"/>, added
+    /// automatically); the state, the radii and the events are not delayed or changed by it.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TreasureSpot : MonoBehaviour
@@ -46,6 +48,14 @@ namespace ItemCollector3D.Treasure
         public event Action<TreasureSpot> Revealed;
         public event Action<TreasureSpot> Collected;
 
+        private TreasureVisualAnimator visualAnimator;
+
+        /// <summary>True for an Epic treasure (its animations are bigger and it hovers with sparkles until collected).</summary>
+        public bool IsEpic => definition != null && definition.Rarity == TreasureRarity.Epic;
+
+        public TreasureVisualAnimator VisualAnimator => visualAnimator;
+        public GameObject VisualRoot => visualRoot;
+
         private void OnEnable()
         {
             ActiveSpots.Add(this);
@@ -65,6 +75,11 @@ namespace ItemCollector3D.Treasure
         {
             EnsureVisual();
             ApplyVisual();
+            visualAnimator = GetComponent<TreasureVisualAnimator>();
+            if (visualAnimator == null)
+            {
+                visualAnimator = gameObject.AddComponent<TreasureVisualAnimator>();
+            }
         }
 
         public void SetSpotId(string id)
@@ -137,6 +152,12 @@ namespace ItemCollector3D.Treasure
 
             State = TreasureState.Revealed;
             ApplyVisual();
+            if (visualAnimator != null && visualRoot != null)
+            {
+                Color accent = definition != null && definition.FeedbackProfile != null ? definition.FeedbackProfile.AccentColor : Color.white;
+                visualAnimator.PlayReveal(visualRoot.transform, IsEpic, accent);
+            }
+
             Revealed?.Invoke(this);
             return true;
         }
@@ -150,15 +171,36 @@ namespace ItemCollector3D.Treasure
             }
 
             State = TreasureState.Collected;
-            ApplyVisual();
+            if (visualAnimator != null && visualRoot != null && visualAnimator.PlayCollect(visualRoot.transform, IsEpic, HideVisualAfterCollect))
+            {
+                // the visual stays up while it plays out and hides itself at the end; the reward is NOT held back
+            }
+            else
+            {
+                ApplyVisual();
+            }
+
             Collected?.Invoke(this);
             return true;
+        }
+
+        private void HideVisualAfterCollect()
+        {
+            if (visualRoot != null && State != TreasureState.Revealed)
+            {
+                visualRoot.SetActive(false);
+            }
         }
 
         private void ApplyVisual()
         {
             if (visualRoot != null)
             {
+                if (visualAnimator != null && State != TreasureState.Revealed)
+                {
+                    visualAnimator.FinishNow(); // never leave a half-played animation behind a hidden or restored visual
+                }
+
                 visualRoot.SetActive(State == TreasureState.Revealed);
             }
         }

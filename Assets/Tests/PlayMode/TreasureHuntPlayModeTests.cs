@@ -151,8 +151,10 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(hunt.TotalGold, Is.EqualTo(10));
             Assert.That(goldText.text, Is.EqualTo("10 / 500 GOLD"));
             Assert.That(goldFill.fillAmount, Is.EqualTo(0.02f).Within(1e-4f), "10 / 500 must fill the bar 2%.");
-            Assert.That(visual.gameObject.activeSelf, Is.False);
+            Assert.That(visual.gameObject.activeSelf, Is.True, "The treasure plays its short collect animation (stage 12B) ...");
             Assert.That(collectButton.gameObject.activeSelf, Is.False);
+            yield return new WaitForSecondsRealtime(TreasureVisualAnimator.CollectSeconds + 0.3f);
+            Assert.That(visual.gameObject.activeSelf, Is.False, "... and is gone when it ends.");
 
             // Second attempts must do nothing.
             collectButton.onClick.Invoke();

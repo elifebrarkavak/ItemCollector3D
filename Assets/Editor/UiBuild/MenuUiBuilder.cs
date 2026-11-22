@@ -76,6 +76,29 @@ namespace ItemCollector3D.EditorTools
                 Button back = TextButton(window, "BackButton", "BACK", ButtonStyle.Green, new Vector2(520f, 132f), 74f);
                 Center(back.GetComponent<RectTransform>(), new Vector2(0f, -240f), new Vector2(520f, 132f));
 
+                // NEW GAME (Main Menu only: the controller shows it and moves BACK to its left; the Pause Menu keeps BACK centred)
+                Button newGame = TextButton(window, "NewGameButton", "NEW GAME", ButtonStyle.Navy, new Vector2(520f, 132f), 66f);
+                Center(newGame.GetComponent<RectTransform>(), new Vector2(SettingsPanelController.ButtonPairOffset, -240f), new Vector2(520f, 132f));
+                newGame.gameObject.SetActive(false);
+
+                // the "START A NEW GAME?" question, on top of everything in this panel (a full dim also blocks touches behind it)
+                var dialog = Rect("NewGameDialog", root.transform);
+                Stretch(dialog);
+                Dim(dialog, 0.74f);
+                RectTransform question = WoodWindow(dialog, new Vector2(1240f, 640f));
+                question.anchoredPosition = new Vector2(0f, -10f);
+                Entrance(question.gameObject, UiEntrance.Style.Pop, 0f, 0.2f);
+                TitleBanner(question, "START A NEW GAME?", new Vector2(980f, 150f), 66f, new Vector2(0f, -4f));
+                TextMeshProUGUI body = BodyText(question, "Body", SettingsPanelController.ConfirmBody, 46f, Cream, TextAlignmentOptions.Center);
+                body.textWrappingMode = TextWrappingModes.Normal;
+                body.overflowMode = TextOverflowModes.Overflow;
+                Center(body.rectTransform, new Vector2(0f, 26f), new Vector2(1020f, 190f));
+                Button cancel = TextButton(question, "CancelButton", "CANCEL", ButtonStyle.Green, new Vector2(520f, 132f), 66f);
+                Center(cancel.GetComponent<RectTransform>(), new Vector2(-SettingsPanelController.ButtonPairOffset, -200f), new Vector2(520f, 132f));
+                Button confirm = TextButton(question, "ConfirmButton", "START NEW GAME", ButtonStyle.Gold, new Vector2(520f, 132f), 50f);
+                Center(confirm.GetComponent<RectTransform>(), new Vector2(SettingsPanelController.ButtonPairOffset, -200f), new Vector2(520f, 132f));
+                dialog.gameObject.SetActive(false);
+
                 var controller = root.GetComponent<SettingsPanelController>();
                 SetRef(controller, "musicSlider", music);
                 SetRef(controller, "sfxSlider", sfx);
@@ -85,6 +108,12 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "cameraValueLabel", cameraValue);
                 SetRef(controller, "backButton", back);
                 SetRef(controller, "closeButton", close);
+                SetRef(controller, "newGameButton", newGame);
+                SetRef(controller, "newGameDialog", dialog.gameObject);
+                SetRef(controller, "newGameTitle", question.Find("TitleBanner/Heading").GetComponent<TMP_Text>());
+                SetRef(controller, "newGameBody", body);
+                SetRef(controller, "cancelNewGameButton", cancel);
+                SetRef(controller, "confirmNewGameButton", confirm);
                 PrefabUtility.SaveAsPrefabAsset(root, SettingsPath);
             }
             finally

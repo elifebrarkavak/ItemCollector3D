@@ -134,6 +134,9 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(model.gameObject.activeSelf, Is.True);
             Assert.That(spot.Reveal(), Is.False, "Cannot reveal twice.");
             Assert.That(spot.Collect(), Is.True);
+            Assert.That(model.gameObject.activeSelf, Is.True, "The treasure plays its short collect animation first (stage 12B) ...");
+            Assert.That(spot.VisualAnimator.IsCollecting, Is.True);
+            spot.VisualAnimator.FinishNow(); // ... and is hidden when it ends (a frame loop would take about 0.4 s)
             Assert.That(model.gameObject.activeSelf, Is.False);
             Assert.That(spot.Collect(), Is.False, "Cannot collect twice.");
             Assert.That(spot.State, Is.EqualTo(TreasureState.Collected));
