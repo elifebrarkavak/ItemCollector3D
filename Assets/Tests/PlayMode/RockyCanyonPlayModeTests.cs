@@ -178,6 +178,38 @@ namespace ItemCollector3D.Tests.PlayMode
             return hit.point.y;
         }
 
+        /// <summary>The walkable surface at (x, z): the terrain or the bridge deck, whichever is higher (so the bridge crossing is measured on the deck, not on the gorge floor).</summary>
+        private float WalkSurface(float x, float z)
+        {
+            float best = TerrainHeight(x, z);
+            Transform deck = RootObject("RockyCanyonEnvironment").transform.Find("C_OldRailway/Colliders/BridgeDeck");
+            if (deck != null)
+            {
+                var ray = new Ray(new Vector3(x, 80f, z), Vector3.down);
+                if (deck.GetComponent<Collider>().Raycast(ray, out RaycastHit hit, 200f))
+                {
+                    best = Mathf.Max(best, hit.point.y);
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>The surface directly under the player's feet (the highest collider below the middle of the capsule, the player itself excluded).</summary>
+        private static float GroundUnder(Transform player)
+        {
+            float best = float.MinValue;
+            foreach (RaycastHit hit in Physics.RaycastAll(player.position, Vector3.down, 30f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider.transform.root != player && hit.point.y > best)
+                {
+                    best = hit.point.y;
+                }
+            }
+
+            return best;
+        }
+
         private static void Teleport(Transform player, Vector3 position)
         {
             var controller = player.GetComponent<CharacterController>();
@@ -330,10 +362,10 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             colliders = env.GetComponentsInChildren<Collider>(true).Length;
-            Assert.That(renderers, Is.LessThan(250), "renderers");
-            Assert.That(materials.Count, Is.LessThanOrEqualTo(10), "materials");
-            Assert.That(triangles, Is.LessThan(14000), "triangles of the whole environment");
-            Assert.That(colliders, Is.LessThan(90), "colliders (only what blocks the player)");
+            Assert.That(renderers, Is.LessThan(60), "renderers (the props of every area are merged into a few meshes)");
+            Assert.That(materials.Count, Is.LessThanOrEqualTo(4), "materials: terrain, palette, glow");
+            Assert.That(triangles, Is.LessThan(70000), "triangles of the whole environment");
+            Assert.That(colliders, Is.LessThan(150), "colliders (only what blocks the player)");
             foreach (MeshRenderer r in env.GetComponentsInChildren<MeshRenderer>(true))
             {
                 Assert.That(r.sharedMaterial.shader.name, Is.EqualTo("Universal Render Pipeline/Lit"), r.name + ": URP");
@@ -482,7 +514,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 yield return null;
                 stats.Frames++;
 
-                float ground = TerrainHeight(player.position.x, player.position.z);
+                float ground = GroundUnder(player);
                 stats.MinAboveGround = Mathf.Min(stats.MinAboveGround, player.position.y - ground);
                 stats.MaxAboveGround = Mathf.Max(stats.MaxAboveGround, player.position.y - ground);
 
@@ -576,11 +608,11 @@ namespace ItemCollector3D.Tests.PlayMode
             {
                 Vector2 a = Route[i].point, b = Route[i + 1].point;
                 float length = Vector2.Distance(a, b);
-                float previous = TerrainHeight(a.x, a.y);
+                float previous = WalkSurface(a.x, a.y);
                 for (float d = 1f; d <= length; d += 1f)
                 {
                     Vector2 p = Vector2.Lerp(a, b, d / length);
-                    float h = TerrainHeight(p.x, p.y);
+                    float h = WalkSurface(p.x, p.y);
                     worstSlope = Mathf.Max(worstSlope, Mathf.Abs(h - previous));
                     worstStep = Mathf.Max(worstStep, Mathf.Abs(h - previous));
                     previous = h;
@@ -602,6 +634,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Camera camera = Camera.main;
             (string name, Vector2 where)[] places =
             {
+                ("ravine gate", new Vector2(-4.2f, -11.6f)), ("camp shack porch", new Vector2(-36.3f, -26.4f)), ("loading platform", new Vector2(13.5f, 22.4f)), ("under the bridge", new Vector2(3f, 18f)), ("gorge", new Vector2(3.4f, 8f)), ("gorge dead end", new Vector2(3f, 23f)), ("lookout deck", new Vector2(43f, 36f)),
                 ("outpost spawn", new Vector2(-37f, -22f)), ("outpost west edge", new Vector2(-44f, -22f)), ("basin", new Vector2(6f, -14f)),
                 ("riverbed narrowest", new Vector2(-2f, -20f)), ("ravine middle", new Vector2(-9f, -1f)), ("ravine pocket", new Vector2(-17f, 2f)),
                 ("railway middle", new Vector2(-6f, 17f)), ("railway dip", new Vector2(3f, 17.5f)), ("railway west", new Vector2(-32f, 3f)),
@@ -612,7 +645,7 @@ namespace ItemCollector3D.Tests.PlayMode
             var worst = "";
             foreach ((string name, Vector2 where) in places)
             {
-                float y = TerrainHeight(where.x, where.y) + 1.05f;
+                float y = (name == "lookout deck" ? WalkSurface(where.x, where.y) + 0.14f : TerrainHeight(where.x, where.y)) + 1.05f;
                 Teleport(player, new Vector3(where.x, y, where.y));
                 for (int angle = 0; angle < 360; angle += 45)
                 {

@@ -68,11 +68,17 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             // junction where the riverbed, the railway and the overlook path meet
             new("Plaza", RcZone.Riverbed, 6f, 12f, new Vector3(40f, 2.0f, 12f)),
 
-            // C  Old Railway: a raised corridor (floor 5 m) with a shallow dip where the bridge will stand
-            new("Railway", RcZone.Railway, 4.5f, 12f,
+            // C  Old Railway: a raised corridor (floor 5 m). Stage 15B cuts it in two at the bridge site (the 15A shallow dip becomes a real gap about 9 m wide, the
+            // two halves end in round abutments) and carves the gorge below the gap; the wooden bridge deck is the only way across. Everything else is unchanged.
+            new("RailwayWest", RcZone.Railway, 4.5f, 12f,
                 new Vector3(-32f, 2.0f, -9f), new Vector3(-32f, 3.0f, 3f), new Vector3(-28f, 4.8f, 12f), new Vector3(-18f, 5.0f, 16f),
-                new Vector3(-6f, 5.0f, 17f), new Vector3(3f, 3.8f, 17.5f), new Vector3(12f, 5.0f, 19f), new Vector3(24f, 5.0f, 20f),
-                new Vector3(33f, 3.6f, 17f), new Vector3(40f, 2.0f, 12f)),
+                new Vector3(-6f, 5.0f, 17f)),
+            new("RailwayEast", RcZone.Railway, 4.5f, 12f,
+                new Vector3(12f, 5.0f, 19f), new Vector3(24f, 5.0f, 20f), new Vector3(33f, 3.6f, 17f), new Vector3(40f, 2.0f, 12f)),
+
+            // the gorge under the bridge: a dry side channel of the riverbed (floor 0 at the basin, 0.8 m at its dead end behind the bridge), 6.4 m wide
+            new("Gorge", RcZone.Riverbed, 3.2f, 12f,
+                new Vector3(6f, 0.0f, -6f), new Vector3(4.5f, 0.1f, 3f), new Vector3(3.5f, 0.3f, 10f), new Vector3(3f, 0.5f, 17.5f), new Vector3(3f, 0.8f, 23f)),
 
             // D  Canyon Overlook: a winding path (never steeper than about 17 degrees) up to a plateau with a low parapet
             new("OverlookPath", RcZone.Overlook, 3.2f, 12f,
@@ -84,6 +90,16 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             new("Ravine", RcZone.Ravine, 4f, 12f,
                 new Vector3(-4f, 0.0f, -13f), new Vector3(-5f, 1.0f, -5f), new Vector3(-9f, 1.6f, -1f), new Vector3(-13f, 2.2f, 1f)),
             new("RavinePocket", RcZone.Ravine, 4.5f, 9f, new Vector3(-17f, 2.4f, 2f)),
+        };
+
+        /// <summary>
+        /// Stage 15B "view windows": (x, z, radius, depth) places where the ROCK MASS (never a floor) is lowered a little, so the bridge's two tall portal towers can be seen from the camp's
+        /// first view. They sit on the rock between the outpost, the ravine and the railway; no walkable floor or slope changes.
+        /// </summary>
+        public static readonly Vector4[] Cuts =
+        {
+            new(-23f, -5.2f, 6.5f, 3.2f),
+            new(-7f, 9f, 7.5f, 3.4f),
         };
 
         // ------------------------------------------------------------------ height field
@@ -195,6 +211,16 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             float wall = Mathf.Min(Wall(edgeMin), cap);
             float rough = Mathf.Lerp(0.10f, 1.3f, Mathf.Clamp01(wall / 3f)); // floors stay smooth, rock faces are irregular
             float h = f + wall + Noise(x, z) * rough * (wall > 0f ? 1f : 0.35f);
+            foreach (Vector4 c in Cuts)
+            {
+                float d = Mathf.Sqrt((x - c.x) * (x - c.x) + (z - c.y) * (z - c.y));
+                if (d < c.z)
+                {
+                    float t = 1f - d / c.z;
+                    h -= c.w * t * t * (3f - 2f * t) * Mathf.Clamp01((wall - 0.8f) / 1.6f);
+                }
+            }
+
             zone = edgeMin <= 0f ? nearest : RcZone.None;
             floorHeight = f;
             return Mathf.Max(h, f - 0.05f);
@@ -249,6 +275,24 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             float dx = Surface(x + 0.5f, z) - Surface(x - 0.5f, z);
             float dz = Surface(x, z + 0.5f) - Surface(x, z - 0.5f);
             return Mathf.Sqrt(dx * dx + dz * dz);
+        }
+
+        /// <summary>The zone of the nearest floor, also for points inside the rock walls (used to tint walls by area).</summary>
+        public static RcZone NearestZone(float x, float z)
+        {
+            float best = float.MaxValue;
+            RcZone zone = RcZone.None;
+            foreach (Shape s in Shapes)
+            {
+                float d = Distance(s, x, z, out _) - s.Radius;
+                if (d < best)
+                {
+                    best = d;
+                    zone = s.Zone;
+                }
+            }
+
+            return zone;
         }
 
         public static RcZone ZoneAt(float x, float z)

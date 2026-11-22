@@ -13,6 +13,7 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
         public const string MeshFolder = Root + "/Meshes";
         public const string MaterialFolder = Root + "/Materials";
         public const string TextureFolder = Root + "/Textures";
+        public const string DressingFolder = MeshFolder + "/Dressing";
 
         public const int ColorMapWidth = 896;   // 8 px per metre over 112 m
         public const int ColorMapHeight = 736;  // 8 px per metre over 92 m
@@ -72,9 +73,11 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
 
         // ================================================================ colour map
 
+        // the sandstone ramp, dark red at the bottom to cream at the top: a rock layer picks ONE of these (hard-edged bands, like real strata)
         private static readonly Color[] Strata =
         {
-            new(0.62f, 0.28f, 0.19f), new(0.76f, 0.37f, 0.22f), new(0.86f, 0.52f, 0.29f), new(0.93f, 0.70f, 0.45f),
+            new(0.44f, 0.20f, 0.14f), new(0.62f, 0.26f, 0.17f), new(0.73f, 0.34f, 0.20f), new(0.85f, 0.46f, 0.24f),
+            new(0.91f, 0.57f, 0.30f), new(0.93f, 0.73f, 0.48f), new(0.96f, 0.84f, 0.63f),
         };
 
         public static Texture2D PaintColorMap()
@@ -103,10 +106,19 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             importer.textureType = TextureImporterType.Default;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.mipmapEnabled = true;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.anisoLevel = 8;
             importer.sRGBTexture = true;
             importer.maxTextureSize = 1024;
             importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        /// <summary>GLSL-style smoothstep(edge0, edge1, x) (also with edge0 &gt; edge1: 1 below edge1, 0 above edge0).</summary>
+        private static float Ss(float e0, float e1, float x)
+        {
+            float t = Mathf.Clamp01((x - e0) / (e1 - e0));
+            return t * t * (3f - 2f * t);
         }
 
         private static float Hash01(int x, int y, int seed)
@@ -119,54 +131,169 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             }
         }
 
+        /// <summary>Layer boundaries every 0.55-1.9 m: returns the layer index and the distance (m) above its lower boundary.</summary>
+        private static int Layer(float h, out float aboveBoundary)
+        {
+            float y = -6f;
+            int i = 0;
+            while (true)
+            {
+                float thickness = 0.55f + 1.35f * Hash01(i, 5, 71);
+                if (h < y + thickness || i > 60)
+                {
+                    aboveBoundary = h - y;
+                    return i;
+                }
+
+                y += thickness;
+                i++;
+            }
+        }
+
+        private static float ZoneTone(RcZone zone)
+        {
+            switch (zone)
+            {
+                case RcZone.Ravine: return -0.22f;     // deeper, redder walls: the hidden place
+                case RcZone.Riverbed: return 0.0f;
+                case RcZone.Outpost: return 0.08f;
+                case RcZone.Railway: return 0.04f;
+                case RcZone.Overlook: return 0.14f;    // pale, sunny sandstone
+                default: return 0.05f;
+            }
+        }
+
         private static Color32 Texel(float x, float z, int px, int py)
         {
             float height = RcLayout.Surface(x, z);
             float slope = RcLayout.Slope(x, z);
             RcLayout.Height(x, z, out RcZone zone, out float floor);
+            RcZone near = RcLayout.NearestZone(x, z);
             float edge = RcLayout.EdgeDistance(x, z);
             float n1 = Mathf.PerlinNoise(x * 0.11f + 10f, z * 0.11f + 30f);
             float n2 = Mathf.PerlinNoise(x * 0.37f + 50f, z * 0.37f + 70f);
+            float n3 = Mathf.PerlinNoise(x * 1.3f + 5f, z * 1.3f + 9f);
             float speck = Hash01(px / 2, py / 2, 11);
 
-            // floor colour by area
+            // ---- floor colour by area (sand, pebbles, ballast, worn trail)
             Color ground;
             switch (zone)
             {
                 case RcZone.Outpost:
-                    ground = Color.Lerp(new Color(0.95f, 0.84f, 0.57f), new Color(0.88f, 0.73f, 0.48f), Mathf.SmoothStep(0.35f, 0.7f, n1));
+                    ground = Color.Lerp(new Color(0.95f, 0.83f, 0.56f), new Color(0.89f, 0.73f, 0.48f), Ss(0.30f, 0.75f, n1));
+                    ground = Color.Lerp(ground, new Color(0.78f, 0.62f, 0.42f), speck > 0.9f ? 0.5f : 0f);
+                    ground = Color.Lerp(ground, new Color(0.76f, 0.56f, 0.38f), Ss(1.1f, 0.3f, OutpostTrailDistance(x, z)) * 0.7f); // worn footpaths
                     break;
                 case RcZone.Riverbed:
-                    ground = Color.Lerp(new Color(0.92f, 0.83f, 0.64f), new Color(0.84f, 0.70f, 0.50f), Mathf.Clamp01(1f - floor / 1.6f) * 0.7f);
-                    ground = Color.Lerp(ground, speck > 0.5f ? new Color(0.56f, 0.46f, 0.38f) : new Color(0.94f, 0.88f, 0.77f), n2 > 0.55f ? 0.45f : 0f); // pebbles
+                    ground = Color.Lerp(new Color(0.94f, 0.85f, 0.65f), new Color(0.86f, 0.72f, 0.51f), Mathf.Clamp01(1f - floor / 1.6f) * 0.7f);
+                    ground = Color.Lerp(ground, new Color(0.80f, 0.66f, 0.47f), Mathf.Clamp01(Mathf.Sin(x * 1.7f + n1 * 9f + z * 0.6f) * 0.5f + 0.5f) * 0.28f); // wind ripples
+                    ground = Color.Lerp(ground, speck > 0.5f ? new Color(0.58f, 0.48f, 0.40f) : new Color(0.95f, 0.89f, 0.78f), n2 > 0.58f ? 0.5f : 0f); // pebbles
+                    ground = Color.Lerp(ground, new Color(0.78f, 0.62f, 0.44f), Ss(2.4f, 0.4f, TrailDistance("Riverbed", x, z) + 1.2f * (n1 - 0.5f)) * 0.5f); // the old channel: darker, packed sand
                     break;
                 case RcZone.Railway:
-                    ground = Color.Lerp(new Color(0.74f, 0.60f, 0.45f), new Color(0.64f, 0.50f, 0.38f), n2);
-                    ground = Color.Lerp(ground, new Color(0.47f, 0.37f, 0.30f), speck > 0.82f ? 0.6f : 0f); // ballast
+                    ground = Color.Lerp(new Color(0.76f, 0.62f, 0.46f), new Color(0.66f, 0.52f, 0.39f), n2);
+                    ground = Color.Lerp(ground, new Color(0.45f, 0.36f, 0.30f), speck > 0.78f ? 0.6f : 0f); // ballast
                     break;
                 case RcZone.Overlook:
-                    ground = Color.Lerp(new Color(0.96f, 0.85f, 0.60f), new Color(0.90f, 0.75f, 0.50f), n1);
+                    ground = Color.Lerp(new Color(0.96f, 0.85f, 0.60f), new Color(0.91f, 0.76f, 0.52f), n1);
+                    ground = Color.Lerp(ground, new Color(0.80f, 0.62f, 0.42f), Ss(0.9f, 0.1f, TrailDistance("OverlookPath", x, z)) * 0.55f); // the worn path
                     break;
                 case RcZone.Ravine:
-                    ground = Color.Lerp(new Color(0.93f, 0.74f, 0.45f), new Color(0.86f, 0.62f, 0.37f), n1);
+                    ground = Color.Lerp(new Color(0.94f, 0.74f, 0.45f), new Color(0.88f, 0.62f, 0.36f), n1);
+                    ground = Color.Lerp(ground, new Color(0.72f, 0.45f, 0.30f), speck > 0.85f ? 0.5f : 0f);
+                    ground = Color.Lerp(ground, new Color(0.80f, 0.52f, 0.33f), Ss(1.8f, 0.3f, TrailDistance("Ravine", x, z)) * 0.5f);
                     break;
                 default:
-                    ground = new Color(0.80f, 0.62f, 0.44f); // the rim above the walls
+                    ground = Color.Lerp(new Color(0.84f, 0.64f, 0.44f), new Color(0.74f, 0.50f, 0.34f), Ss(0.3f, 0.7f, n1)); // the rim above the walls
                     break;
             }
 
-            // rock faces: horizontal strata bands that follow the height
-            float band = Mathf.Clamp01(Mathf.Sin(height * 2.4f + n1 * 5f) * 0.5f + 0.5f + (n2 - 0.5f) * 0.3f);
-            float pos = band * 3f;
-            int stop = Mathf.Min(2, (int)pos);
-            Color rock = Color.Lerp(Strata[stop], Strata[stop + 1], pos - stop); // a smooth ramp through the four stops, no hard stripes
-            float shade = Mathf.Lerp(0.88f, 1.06f, n2);
-            rock *= shade;
+            ground = Color.Lerp(ground, new Color(0.86f, 0.60f, 0.36f), 0.24f); // a warmer, slightly deeper desert sand (the sun is strong)
 
-            float wallness = Mathf.Max(Mathf.SmoothStep(0.30f, 0.85f, slope), Mathf.SmoothStep(0f, 1.2f, edge) * 0.8f);
+            // ---- rock faces: hard-edged horizontal layers that dip a little with the noise, a dark line under every layer, vertical weathering streaks
+            float h = height + (n1 - 0.5f) * 1.6f + x * 0.03f;
+            int layer = Layer(h, out float above);
+            float tone = Mathf.Clamp01(0.42f * Hash01(layer, 3, 13) + 0.45f * Mathf.Clamp01(height / 20f) + 0.13f * n2 + ZoneTone(near));
+            Color rock = Strata[Mathf.Clamp(Mathf.FloorToInt(tone * Strata.Length), 0, Strata.Length - 1)];
+            float shadowLine = Ss(0.26f, 0.0f, above);
+            rock = Color.Lerp(rock, rock * 0.72f, shadowLine * 0.85f);
+            float streak = Mathf.PerlinNoise((x + z) * 2.6f + 3f, (x - z) * 0.35f + 7f);
+            rock *= Mathf.Lerp(0.86f, 1.06f, streak);
+            rock *= Mathf.Lerp(0.95f, 1.04f, n3);
+
+            // ---- the foot of a wall: fallen scree
+            float scree = Ss(0f, 0.8f, edge) * Ss(3.2f, 0.8f, edge) * Ss(0.62f, 0.25f, slope);
+            Color screeColor = speck > 0.55f ? Color.Lerp(rock, new Color(0.66f, 0.50f, 0.40f), 0.55f) : Color.Lerp(ground, rock, 0.5f);
+            float wallness = Ss(0.32f, 0.78f, slope);
             Color c = Color.Lerp(ground, rock, wallness);
+            c = Color.Lerp(c, screeColor, scree * 0.45f * (1f - wallness));
+
+            // ---- the cap of the rock mass: flat, light, sun-baked sandstone with a lumpy pattern
+            if (zone == RcZone.None && slope < 0.34f && edge > 0.5f)
+            {
+                Color top = Color.Lerp(new Color(0.88f, 0.62f, 0.40f), new Color(0.93f, 0.74f, 0.50f), n1);
+                top = Color.Lerp(top, new Color(0.74f, 0.45f, 0.30f), Ss(0.55f, 0.8f, n3) * 0.6f);
+                c = Color.Lerp(c, top, 1f - wallness);
+            }
+
+            // ---- a dark crease where the floor meets the wall (cheap ambient occlusion)
+            c *= 1f - 0.16f * Ss(1.0f, 0f, Mathf.Abs(edge + 0.1f)) * Ss(0.3f, 0.7f, slope + 0.2f);
             c.a = 1f;
             return c;
+        }
+
+        private static float SegmentDistance(float ax, float az, float bx, float bz, float x, float z)
+        {
+            float dx = bx - ax, dz = bz - az;
+            float t = Mathf.Clamp01(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz));
+            float cx = ax + dx * t - x, cz = az + dz * t - z;
+            return Mathf.Sqrt(cx * cx + cz * cz);
+        }
+
+        /// <summary>Distance (m) to the centre line of a layout shape (for the worn-trail tints of the overlook path, the riverbed's thalweg and the ravine path).</summary>
+        private static float TrailDistance(string shapeName, float x, float z)
+        {
+            foreach (RcLayout.Shape s in RcLayout.Shapes)
+            {
+                if (s.Name != shapeName)
+                {
+                    continue;
+                }
+
+                float best = float.MaxValue;
+                Vector3[] p = s.Points;
+                for (int i = 0; i < p.Length - 1; i++)
+                {
+                    best = Mathf.Min(best, SegmentDistance(p[i].x, p[i].z, p[i + 1].x, p[i + 1].z, x, z));
+                }
+
+                return best;
+            }
+
+            return 99f;
+        }
+
+        // the outpost's footpaths (worn earth between the shack door, the camp fire, the shed, the water tower and the two ways out)
+        private static readonly Vector2[][] OutpostTrails =
+        {
+            new[] { new Vector2(-37.5f, -28.2f), new Vector2(-35f, -25.6f), new Vector2(-32f, -24.2f), new Vector2(-29f, -22.8f), new Vector2(-25.5f, -21.6f), new Vector2(-20f, -20f) },
+            new[] { new Vector2(-33f, -24.6f), new Vector2(-30.5f, -26.5f), new Vector2(-28f, -27.6f) },
+            new[] { new Vector2(-34.5f, -24.5f), new Vector2(-33.8f, -19.5f), new Vector2(-32.4f, -14f) },
+            new[] { new Vector2(-37f, -22.5f), new Vector2(-39.5f, -18.5f), new Vector2(-40.8f, -16.4f) },
+        };
+
+        private static float OutpostTrailDistance(float x, float z)
+        {
+            float best = float.MaxValue;
+            foreach (Vector2[] t in OutpostTrails)
+            {
+                for (int i = 0; i < t.Length - 1; i++)
+                {
+                    best = Mathf.Min(best, SegmentDistance(t[i].x, t[i].y, t[i + 1].x, t[i + 1].y, x, z));
+                }
+            }
+
+            return best;
         }
 
         // ================================================================ sky
@@ -186,13 +313,26 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
                 else
                 {
                     float u = (t - 0.5f) * 2f;
-                    c = Color.Lerp(new Color(0.99f, 0.84f, 0.64f), new Color(0.42f, 0.66f, 0.90f), Mathf.Pow(u, 0.55f)); // warm horizon to a clear blue
+                    c = Color.Lerp(new Color(0.99f, 0.84f, 0.64f), new Color(0.36f, 0.62f, 0.92f), Mathf.Pow(u, 0.5f)); // warm horizon to a clear blue
                 }
 
                 for (int x = 0; x < w; x++)
                 {
-                    float glow = Mathf.Exp(-Mathf.Pow((x / (float)w - 0.72f) * 7f, 2f)) * Mathf.Exp(-Mathf.Pow((t - 0.62f) * 4.5f, 2f)) * 0.22f; // the sun's glow
-                    pixels[y * w + x] = c + new Color(glow, glow * 0.8f, glow * 0.45f);
+                    float u = x / (float)w;
+                    float glow = Mathf.Exp(-Mathf.Pow((u - 0.72f) * 7f, 2f)) * Mathf.Exp(-Mathf.Pow((t - 0.62f) * 4.5f, 2f)) * 0.22f; // the sun's glow
+                    Color px = c + new Color(glow, glow * 0.8f, glow * 0.45f);
+                    // a few soft, flat clouds high above the horizon: a clear sky with some character
+                    float cloud = 0f;
+                    for (int k = 0; k < 7; k++)
+                    {
+                        float cx = (0.07f + k * 0.143f + 0.05f * Hash01(k, 1, 3)) % 1f, ct = 0.60f + 0.20f * Hash01(k, 2, 3);
+                        float rx = 0.05f + 0.06f * Hash01(k, 3, 3), rt = 0.012f + 0.018f * Hash01(k, 4, 3);
+                        float dx = Mathf.Min(Mathf.Abs(u - cx), 1f - Mathf.Abs(u - cx)) / rx, dt = (t - ct) / rt;
+                        float d2 = dx * dx + dt * dt;
+                        cloud = Mathf.Max(cloud, Ss(1f, 0.25f, d2));
+                    }
+
+                    pixels[y * w + x] = Color.Lerp(px, new Color(1f, 0.97f, 0.92f), cloud * 0.8f);
                 }
             }
 
@@ -210,123 +350,6 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             importer.maxTextureSize = 512;
             importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-        }
-
-        // ================================================================ shared rock meshes
-
-        /// <summary>A faceted boulder (20 triangles, its own vertices for flat shading), about 1 m across, flat at the bottom.</summary>
-        public static Mesh BoulderMesh()
-        {
-            string path = MeshFolder + "/RC_Boulder.asset";
-            Mesh mesh = LoadOrCreateMesh(path, "RC_Boulder");
-            float t = (1f + Mathf.Sqrt(5f)) / 2f;
-            Vector3[] v =
-            {
-                new(-1, t, 0), new(1, t, 0), new(-1, -t, 0), new(1, -t, 0), new(0, -1, t), new(0, 1, t),
-                new(0, -1, -t), new(0, 1, -t), new(t, 0, -1), new(t, 0, 1), new(-t, 0, -1), new(-t, 0, 1),
-            };
-            int[] f =
-            {
-                0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4, 11, 10, 2, 10, 7, 6, 7, 1, 8,
-                3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3, 8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
-            };
-            var rng = new System.Random(77);
-            var jitter = new Vector3[v.Length];
-            for (int i = 0; i < v.Length; i++)
-            {
-                Vector3 p = v[i].normalized * (0.42f + 0.1f * (float)rng.NextDouble());
-                p.y = Mathf.Max(p.y * 0.8f, -0.18f); // squashed, flat underneath so it sits in the ground
-                jitter[i] = p;
-            }
-
-            var verts = new List<Vector3>();
-            var tris = new List<int>();
-            for (int i = 0; i < f.Length; i += 3)
-            {
-                Vector3 a = jitter[f[i]], b = jitter[f[i + 1]], c = jitter[f[i + 2]];
-                if (Vector3.Dot(Vector3.Cross(b - a, c - a), (a + b + c) / 3f) < 0f)
-                {
-                    (b, c) = (c, b); // wind every face so that its normal (Unity: clockwise) points away from the centre
-                }
-
-                foreach (Vector3 corner in new[] { a, b, c })
-                {
-                    tris.Add(verts.Count);
-                    verts.Add(corner);
-                }
-            }
-
-            mesh.Clear();
-            mesh.SetVertices(verts);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            EditorUtility.SetDirty(mesh);
-            return mesh;
-        }
-
-        /// <summary>A rock pillar / butte: a hexagonal prism, 1 m wide and 1 m tall, narrower at the top (16 triangles, flat shaded). Scale it tall.</summary>
-        public static Mesh PillarMesh()
-        {
-            string path = MeshFolder + "/RC_Pillar.asset";
-            Mesh mesh = LoadOrCreateMesh(path, "RC_Pillar");
-            var verts = new List<Vector3>();
-            var tris = new List<int>();
-            const int sides = 6;
-            var rng = new System.Random(5);
-            Vector3[] bottom = new Vector3[sides], top = new Vector3[sides];
-            for (int i = 0; i < sides; i++)
-            {
-                float a = i / (float)sides * Mathf.PI * 2f;
-                float jitter = 0.9f + 0.2f * (float)rng.NextDouble();
-                bottom[i] = new Vector3(Mathf.Cos(a) * 0.5f * jitter, 0f, Mathf.Sin(a) * 0.5f * jitter);
-                top[i] = new Vector3(Mathf.Cos(a) * 0.34f, 1f, Mathf.Sin(a) * 0.34f);
-            }
-
-            for (int i = 0; i < sides; i++)
-            {
-                int n = (i + 1) % sides;
-                AddQuad(verts, tris, bottom[i], top[i], top[n], bottom[n]);
-            }
-
-            for (int i = 1; i < sides - 1; i++) // top cap
-            {
-                AddTri(verts, tris, top[0], top[i + 1], top[i]);
-            }
-
-            mesh.Clear();
-            mesh.SetVertices(verts);
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            EditorUtility.SetDirty(mesh);
-            return mesh;
-        }
-
-        private static void AddTri(List<Vector3> verts, List<int> tris, Vector3 a, Vector3 b, Vector3 c)
-        {
-            tris.Add(verts.Count); verts.Add(a);
-            tris.Add(verts.Count); verts.Add(b);
-            tris.Add(verts.Count); verts.Add(c);
-        }
-
-        private static void AddQuad(List<Vector3> verts, List<int> tris, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-        {
-            AddTri(verts, tris, a, b, c);
-            AddTri(verts, tris, a, c, d);
-        }
-
-        private static Mesh LoadOrCreateMesh(string path, string name)
-        {
-            Directory.CreateDirectory(MeshFolder);
-            Mesh mesh = AssetDatabase.LoadAssetAtPath<Mesh>(path);
-            if (mesh == null)
-            {
-                mesh = new Mesh { name = name };
-                AssetDatabase.CreateAsset(mesh, path);
-            }
-
-            return mesh;
         }
 
         // ================================================================ materials
@@ -350,6 +373,20 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             mat.SetFloat("_EnvironmentReflections", 0f);
             mat.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
             mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        public static Material PaletteMaterial(Texture2D palette) => Lit("RC_Palette", Color.white, palette);
+
+        /// <summary>The same palette, but self-lit (gold veins, camp fire, lantern glass): the only emissive material, no transparency.</summary>
+        public static Material GlowMaterial(Texture2D palette)
+        {
+            Material mat = Lit("RC_Glow", Color.white, palette);
+            mat.EnableKeyword("_EMISSION");
+            mat.SetColor("_EmissionColor", new Color(0.62f, 0.54f, 0.42f));
+            mat.SetTexture("_EmissionMap", palette);
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
             EditorUtility.SetDirty(mat);
             return mat;
         }
