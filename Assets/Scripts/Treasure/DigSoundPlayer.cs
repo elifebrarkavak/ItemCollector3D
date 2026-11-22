@@ -1,3 +1,4 @@
+using ItemCollector3D.Audio;
 using ItemCollector3D.Menus;
 using UnityEngine;
 
@@ -6,8 +7,9 @@ namespace ItemCollector3D.Treasure
     /// <summary>
     /// Plays the short dig sound (one per stroke) through ONE AudioSource: a new play restarts the source instead of
     /// stacking, and a minimum repeat interval ignores accidental double triggers. Without an audio file it synthesises
-    /// a short earthy thud + scrape; assign <c>digClip</c> later to use a real sound. Whether it is audible on a device
-    /// is NOT verified by code - only that it is triggered.
+    /// a short, soft earthy thud + scrape (<see cref="SoundSynth.DigStroke"/>); assign <c>digClip</c> later to use a real sound.
+    /// The "treasure revealed" cue (<see cref="PlayReveal"/>) has its own AudioSource, so it never cuts the last stroke short.
+    /// Whether it is audible on a device is NOT verified by code - only that it is triggered.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DigSoundPlayer : MonoBehaviour
@@ -17,9 +19,15 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private AudioClip digClip;
         [SerializeField, Range(0f, 1f)] private float volume = 0.75f;
         [SerializeField, Min(0f)] private float minRepeatInterval = 0.05f;
+        [Tooltip("Optional real clip for the treasure reveal. Empty = built-in soft two-note discovery sound.")]
+        [SerializeField] private AudioClip revealClip;
+        [SerializeField, Range(0f, 1f)] private float revealVolume = 0.55f;
 
+        private AudioSource revealSource;
         private AudioClip placeholder;
+        private AudioClip revealPlaceholder;
         private float lastPlayTime = float.NegativeInfinity;
+        private float lastRevealTime = float.NegativeInfinity;
 
         public int PlayCount { get; private set; }
         public float LastPitch { get; private set; }
@@ -27,6 +35,11 @@ namespace ItemCollector3D.Treasure
         public bool LastUsedAssignedClip { get; private set; }
         public bool IsPlaying => source != null && source.isPlaying;
         public AudioSource Source => source;
+
+        /// <summary>How many reveal cues were started (one per revealed treasure).</summary>
+        public int RevealCount { get; private set; }
+        public float LastRevealVolume { get; private set; }
+        public bool IsRevealPlaying => revealSource != null && revealSource.isPlaying;
 
         private void Awake()
         {
@@ -38,6 +51,24 @@ namespace ItemCollector3D.Treasure
             source.playOnAwake = false;
             source.loop = false;
             source.spatialBlend = 0f;
+
+            revealSource = gameObject.AddComponent<AudioSource>();
+            revealSource.playOnAwake = false;
+            revealSource.loop = false;
+            revealSource.spatialBlend = 0f;
+        }
+
+        private void OnDestroy()
+        {
+            if (placeholder != null)
+            {
+                Destroy(placeholder);
+            }
+
+            if (revealPlaceholder != null)
+            {
+                Destroy(revealPlaceholder);
+            }
         }
 
         /// <returns>true if a sound was started.</returns>
@@ -52,7 +83,11 @@ namespace ItemCollector3D.Treasure
             LastUsedAssignedClip = clip != null;
             if (clip == null)
             {
-                placeholder ??= CreateThud();
+                if (placeholder == null)
+                {
+                    placeholder = SoundSynth.DigStroke();
+                }
+
                 clip = placeholder;
             }
 
@@ -69,27 +104,35 @@ namespace ItemCollector3D.Treasure
             return true;
         }
 
-        private static AudioClip CreateThud()
+        /// <summary>The treasure has just come out of the ground: one short, soft discovery sound.</summary>
+        /// <returns>true if a sound was started.</returns>
+        public bool PlayReveal()
         {
-            const int sampleRate = 44100;
-            const float seconds = 0.16f;
-            int count = Mathf.CeilToInt(sampleRate * seconds);
-            var samples = new float[count];
-            var random = new System.Random(1234);
-            float lowpass = 0f;
-            for (int i = 0; i < count; i++)
+            if (revealSource == null || Time.unscaledTime - lastRevealTime < 0.2f)
             {
-                float t = (float)i / sampleRate;
-                float thump = Mathf.Sin(2f * Mathf.PI * (110f - 300f * t) * t) * Mathf.Exp(-24f * t);
-                float noise = (float)(random.NextDouble() * 2.0 - 1.0);
-                lowpass += 0.25f * (noise - lowpass); // one-pole low-pass: dull scrape
-                float scrape = lowpass * Mathf.Exp(-18f * t);
-                samples[i] = (thump * 0.8f + scrape * 0.9f) * 0.7f;
+                return false;
             }
 
-            AudioClip clip = AudioClip.Create("DigThud", count, 1, sampleRate, false);
-            clip.SetData(samples, 0);
-            return clip;
+            AudioClip clip = revealClip;
+            if (clip == null)
+            {
+                if (revealPlaceholder == null)
+                {
+                    revealPlaceholder = SoundSynth.Reveal();
+                }
+
+                clip = revealPlaceholder;
+            }
+
+            lastRevealTime = Time.unscaledTime;
+            LastRevealVolume = revealVolume * GameSettings.SfxScale; // Settings > SFX Volume
+            revealSource.Stop();
+            revealSource.clip = clip;
+            revealSource.pitch = 1f;
+            revealSource.volume = LastRevealVolume;
+            revealSource.Play();
+            RevealCount++;
+            return true;
         }
     }
 }

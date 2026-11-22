@@ -4,7 +4,7 @@ namespace ItemCollector3D.Treasure
 {
     /// <summary>
     /// Turns the existing <see cref="TreasureHuntController"/> dig phase into feedback: the player dig motion,
-    /// dirt at the dig spot and a dig sound on each stroke, plus a final dirt puff when the treasure is revealed.
+    /// dirt at the dig spot and a dig sound on each stroke, plus a final dirt puff and a soft discovery sound when the treasure is revealed.
     /// It only listens to <see cref="TreasureHuntController.DigStarted"/> / <see cref="TreasureHuntController.DigCompleted"/>
     /// and owns no treasure state, so TreasureSpot / reveal / collect / rarity feedback keep working unchanged.
     /// </summary>
@@ -122,6 +122,11 @@ namespace ItemCollector3D.Treasure
             if (dirt != null && spot != null)
             {
                 dirt.PlayReveal(spot.transform.position);
+            }
+
+            if (sound != null)
+            {
+                sound.PlayReveal(); // the short discovery sound, once per revealed treasure (never on a cancelled dig)
             }
 
             RevealPuffs++;
