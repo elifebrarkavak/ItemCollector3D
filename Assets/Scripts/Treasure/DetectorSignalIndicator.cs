@@ -1,3 +1,4 @@
+using ItemCollector3D.Audio;
 using ItemCollector3D.Menus;
 using TMPro;
 using UnityEngine;
@@ -7,7 +8,9 @@ namespace ItemCollector3D.Treasure
 {
     /// <summary>
     /// Feedback for detector pulses: a flashing dot, a status label (NO SIGNAL / SLOW / FAST / RAPID) with a three-step level meter, and a
-    /// procedural beep (no audio assets needed). It only displays what <see cref="TreasureDetector"/> reports: there is no second signal system.
+    /// soft synthesised beep (no audio assets needed). The beep follows the detector's own pulse rhythm (slow far away, quick close by), rises in
+    /// pitch and loudness with the proximity, never overlaps itself, and steps back while a dig is running so it does not mask the dig sound.
+    /// It only displays what <see cref="TreasureDetector"/> reports: there is no second signal system.
     /// Lives in the gameplay scene, not in the shared HUD prefab.
     /// </summary>
     [DisallowMultipleComponent]
@@ -56,8 +59,46 @@ namespace ItemCollector3D.Treasure
         private float flashStrength;
         private AudioClip beep;
         private int appliedLevel = -1;
+        private TMP_Text hintLabel;
+        private TreasureHuntController hunt;
+        private float cancelHintUntil;
+        private float lastBeepTime = float.NegativeInfinity;
+
+        /// <summary>Lowest and highest beep pitch (a multiplier on the 660 Hz clip): about 560 Hz at the edge of the range, about 890 Hz inside the dig radius.</summary>
+        public const float FarthestBeepPitch = 0.85f;
+        public const float NearestBeepPitch = 1.35f;
+
+        /// <summary>Overall softness of the beep on top of the strength-based volume (the scene keeps its own volume range).</summary>
+        public const float BeepGain = 0.7f;
+
+        /// <summary>A pulse closer than this (real seconds) to the previous beep is not voiced again, so beeps can never pile up.</summary>
+        public const float MinBeepSpacing = 0.12f;
+
+        /// <summary>Beep loudness while a dig is running (the dig sound takes the foreground).</summary>
+        public const float DiggingBeepFactor = 0.35f;
+
+        public const string GetCloserHint = "GET CLOSER TO DIG";
+        public const string DigCancelledHint = "TOO FAR - STAY CLOSE TO DIG";
+
+        /// <summary>RAPID means "close", not "dig now": DIG is offered only inside the dig radius (<see cref="TreasureDetector.Proximity"/> reaches 1 there).</summary>
+        public static bool IsInsideDigRange(float proximity) => proximity >= 0.999f;
+
+        /// <summary>The short hint shown under the signal plate: empty when there is nothing to explain.</summary>
+        public string Hint => hintLabel != null && hintLabel.gameObject.activeSelf ? hintLabel.text : string.Empty;
 
         public int PulseCount { get; private set; }
+
+        /// <summary>How many pulses were actually voiced (a pulse inside <see cref="MinBeepSpacing"/> of the last beep, or while paused, is skipped).</summary>
+        public int BeepCount { get; private set; }
+
+        /// <summary>Pitch multiplier of the most recent beep.</summary>
+        public float LastBeepPitch { get; private set; }
+
+        /// <summary>The beep pitch for a proximity: rises steadily from far (SLOW) to close (RAPID).</summary>
+        public static float BeepPitchFor(float proximity)
+        {
+            return Mathf.Lerp(FarthestBeepPitch, NearestBeepPitch, Mathf.Clamp01(proximity));
+        }
 
         /// <summary>Strength (0..1) of the most recent pulse: weak far away, strong when close.</summary>
         public float LastPulseStrength { get; private set; }
@@ -104,13 +145,91 @@ namespace ItemCollector3D.Treasure
 
         private void Awake()
         {
-            beep = CreateBeep();
+            beep = SoundSynth.Beep();
             if (flashGraphic != null)
             {
                 flashGraphic.color = idleColor;
             }
 
+            CreateHintLabel();
             ApplyLevel(SignalLevel.None);
+        }
+
+        private void Start()
+        {
+            hunt = FindAnyObjectByType<TreasureHuntController>();
+            if (hunt != null)
+            {
+                hunt.DigCancelled += HandleDigCancelled;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (hunt != null)
+            {
+                hunt.DigCancelled -= HandleDigCancelled;
+            }
+        }
+
+        private void HandleDigCancelled(TreasureSpot spot)
+        {
+            cancelHintUntil = Time.unscaledTime + 2.5f; // the player walked out of the dig range: say why nothing came out of the ground
+        }
+
+        private void CreateHintLabel()
+        {
+            if (label == null || hintLabel != null)
+            {
+                return;
+            }
+
+            hintLabel = Instantiate(label, transform);
+            hintLabel.name = "HintLabel";
+            var rect = hintLabel.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -8f);
+            rect.sizeDelta = new Vector2(Mathf.Max(420f, ((RectTransform)transform).rect.width * 1.5f), 48f);
+            rect.localScale = Vector3.one;
+            hintLabel.enableAutoSizing = false;
+            hintLabel.fontSize = Mathf.Max(18f, label.fontSize * 0.72f);
+            hintLabel.alignment = TextAlignmentOptions.Center;
+            hintLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            hintLabel.raycastTarget = false;
+            hintLabel.gameObject.SetActive(false);
+        }
+
+        private void RefreshHint()
+        {
+            if (hintLabel == null)
+            {
+                return;
+            }
+
+            string text = string.Empty;
+            Color color = rapidColor;
+            if (Time.unscaledTime < cancelHintUntil)
+            {
+                text = DigCancelledHint;
+            }
+            else if (detector != null && Level == SignalLevel.Rapid && !IsInsideDigRange(detector.Proximity))
+            {
+                text = GetCloserHint;
+                color = fastColor;
+            }
+
+            bool show = text.Length > 0;
+            if (hintLabel.gameObject.activeSelf != show)
+            {
+                hintLabel.gameObject.SetActive(show);
+            }
+
+            if (show)
+            {
+                hintLabel.text = text;
+                hintLabel.color = color;
+            }
         }
 
         private void OnEnable()
@@ -148,6 +267,8 @@ namespace ItemCollector3D.Treasure
             {
                 ApplyLevel(LevelFor(detector.HasSignal, detector.Proximity));
             }
+
+            RefreshHint();
         }
 
         private void ApplyLevel(SignalLevel level)
@@ -192,31 +313,16 @@ namespace ItemCollector3D.Treasure
             flashStrength = StrengthFor(proximity, weakestStrength);
             LastPulseStrength = flashStrength;
 
-            if (audioSource != null && beep != null)
+            if (audioSource != null && beep != null && !GamePause.IsPaused && Time.unscaledTime - lastBeepTime >= MinBeepSpacing)
             {
-                audioSource.pitch = Mathf.Lerp(0.8f, 1.6f, proximity);
-                LastBeepVolume = Mathf.Lerp(weakestBeepVolume, strongestBeepVolume, flashStrength) * GameSettings.SfxScale; // Settings > SFX Volume
+                lastBeepTime = Time.unscaledTime;
+                LastBeepPitch = BeepPitchFor(proximity);
+                float duck = hunt != null && hunt.IsDigging ? DiggingBeepFactor : 1f;
+                audioSource.pitch = LastBeepPitch;
+                LastBeepVolume = Mathf.Lerp(weakestBeepVolume, strongestBeepVolume, flashStrength) * BeepGain * duck * GameSettings.SfxScale; // Settings > SFX Volume
                 audioSource.PlayOneShot(beep, LastBeepVolume);
+                BeepCount++;
             }
-        }
-
-        private static AudioClip CreateBeep()
-        {
-            const int sampleRate = 44100;
-            const float seconds = 0.07f;
-            const float frequency = 880f;
-            int sampleCount = Mathf.CeilToInt(sampleRate * seconds);
-            float[] samples = new float[sampleCount];
-            for (int i = 0; i < sampleCount; i++)
-            {
-                float t = (float)i / sampleRate;
-                float envelope = 1f - (float)i / sampleCount;
-                samples[i] = Mathf.Sin(2f * Mathf.PI * frequency * t) * envelope;
-            }
-
-            AudioClip clip = AudioClip.Create("DetectorBeep", sampleCount, 1, sampleRate, false);
-            clip.SetData(samples, 0);
-            return clip;
         }
     }
 }

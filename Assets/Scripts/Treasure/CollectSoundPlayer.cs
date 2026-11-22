@@ -1,3 +1,4 @@
+using ItemCollector3D.Audio;
 using ItemCollector3D.Menus;
 using UnityEngine;
 
@@ -5,7 +6,8 @@ namespace ItemCollector3D.Treasure
 {
     /// <summary>
     /// Plays the collect sound through ONE AudioSource (a new play restarts it instead of stacking).
-    /// Without audio files it synthesises a short placeholder chime; a profile's own clip replaces it.
+    /// Without audio files it synthesises a short gold-coin chime (<see cref="SoundSynth.CollectCoin"/>); Epic treasure gets a longer,
+    /// richer one (<see cref="SoundSynth.CollectEpic"/>); a profile's own clip replaces both.
     /// Pitch and loudness come from the feedback profile. Whether it is audible on a device is NOT verified by code.
     /// </summary>
     [DisallowMultipleComponent]
@@ -18,12 +20,16 @@ namespace ItemCollector3D.Treasure
         [SerializeField, Min(0f)] private float minRepeatInterval = 0.05f;
 
         private AudioClip placeholderChime;
+        private AudioClip epicChime;
         private float lastPlayTime = float.NegativeInfinity;
 
         public int PlayCount { get; private set; }
         public float LastPitch { get; private set; }
         public float LastVolume { get; private set; }
         public bool LastUsedProfileClip { get; private set; }
+
+        /// <summary>True when the last sound was the special Epic one.</summary>
+        public bool LastWasSpecial { get; private set; }
         public bool IsPlaying => source != null && source.isPlaying;
 
         private void Awake()
@@ -38,8 +44,22 @@ namespace ItemCollector3D.Treasure
             source.spatialBlend = 0f;
         }
 
+        private void OnDestroy()
+        {
+            if (placeholderChime != null)
+            {
+                Destroy(placeholderChime);
+            }
+
+            if (epicChime != null)
+            {
+                Destroy(epicChime);
+            }
+        }
+
+        /// <param name="special">true for an Epic treasure: plays the longer, richer reward sound (unless the profile brings its own clip).</param>
         /// <returns>true if a sound was started.</returns>
-        public bool Play(TreasureFeedbackProfile profile, float intensity)
+        public bool Play(TreasureFeedbackProfile profile, float intensity, bool special = false)
         {
             if (source == null || Time.unscaledTime - lastPlayTime < minRepeatInterval)
             {
@@ -48,9 +68,25 @@ namespace ItemCollector3D.Treasure
 
             AudioClip clip = profile != null ? profile.CollectSound : null;
             LastUsedProfileClip = clip != null;
+            LastWasSpecial = false;
+            if (clip == null && special)
+            {
+                if (epicChime == null)
+                {
+                    epicChime = SoundSynth.CollectEpic();
+                }
+
+                clip = epicChime;
+                LastWasSpecial = true;
+            }
+
             if (clip == null)
             {
-                placeholderChime ??= CreateChime();
+                if (placeholderChime == null)
+                {
+                    placeholderChime = SoundSynth.CollectCoin();
+                }
+
                 clip = placeholderChime;
             }
 
@@ -65,27 +101,6 @@ namespace ItemCollector3D.Treasure
             source.Play();
             PlayCount++;
             return true;
-        }
-
-        private static AudioClip CreateChime()
-        {
-            const int sampleRate = 44100;
-            const float seconds = 0.22f;
-            const float frequency = 660f;
-            int count = Mathf.CeilToInt(sampleRate * seconds);
-            var samples = new float[count];
-            for (int i = 0; i < count; i++)
-            {
-                float t = (float)i / sampleRate;
-                float envelope = Mathf.Exp(-14f * t);
-                float tone = Mathf.Sin(2f * Mathf.PI * frequency * t)
-                             + 0.5f * Mathf.Sin(2f * Mathf.PI * frequency * 1.5f * t);
-                samples[i] = tone * envelope * 0.6f;
-            }
-
-            AudioClip clip = AudioClip.Create("CollectChime", count, 1, sampleRate, false);
-            clip.SetData(samples, 0);
-            return clip;
         }
     }
 }

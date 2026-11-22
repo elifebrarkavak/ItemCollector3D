@@ -79,7 +79,8 @@ namespace ItemCollector3D.Treasure
 
             if (sound != null)
             {
-                sound.Play(profile, intensity);
+                bool epic = spot.Definition != null && spot.Definition.Rarity == TreasureRarity.Epic;
+                sound.Play(profile, intensity, epic);
             }
 
             RewardsShown++;
