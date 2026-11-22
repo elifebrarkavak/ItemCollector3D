@@ -29,8 +29,14 @@ namespace ItemCollector3D.Player
         [SerializeField, Min(0f)] private float collisionPadding = 0.1f;
         [SerializeField, Min(0.1f)] private float minimumDistance = 0.5f;
 
+        [Header("Narrow places (only while a level volume such as the mine has raised the minimum distance)")]
+        [Tooltip("When the free orbit distance is shorter than this, the camera swings around the player towards open space instead of pressing against the wall.")]
+        [SerializeField, Min(0f)] private float swingComfortDistance = 2.6f;
+        [SerializeField, Min(0f)] private float swingSpeed = 300f;
+
         private Vector3 positionVelocity;
         private int activeOrbitTouchId = -1;
+        private bool orbitInputActive;
         private float environmentDistanceScale = 1f;
         private float environmentMinimumDistance;
 
@@ -68,6 +74,24 @@ namespace ItemCollector3D.Player
             Vector3 pivot = target.position + targetOffset;
             Vector3 cameraDirection = rotation * Vector3.back;
             float resolvedDistance = ResolveCollisionDistance(pivot, cameraDirection, out float freeDistance);
+            if (environmentMinimumDistance > 0f && !orbitInputActive && freeDistance < SwingComfort)
+            {
+                // a wall right behind the player (a narrow tunnel while the camera looks sideways): swing the orbit round to the nearest open side rather than
+                // squeezing the camera against the wall, where the player's head would fill the screen. The player's own orbit input always wins.
+                float offset = OpenYawOffset(pivot);
+                if (offset != 0f)
+                {
+                    yaw = Mathf.MoveTowardsAngle(yaw, yaw + offset, swingSpeed * Time.deltaTime);
+                    rotation = Quaternion.Euler(pitch, yaw, 0f);
+                    cameraDirection = rotation * Vector3.back;
+                    resolvedDistance = ResolveCollisionDistance(pivot, cameraDirection, out freeDistance);
+                    if (freeDistance < Mathf.Min(environmentMinimumDistance, EffectiveDistance))
+                    {
+                        resolvedDistance = Mathf.Clamp(freeDistance, minimumDistance, EffectiveDistance); // mid-swing: never place the camera inside the wall
+                    }
+                }
+            }
+
             if (environmentMinimumDistance > 0f && freeDistance < Mathf.Min(environmentMinimumDistance, EffectiveDistance))
             {
                 // squeezed between the player and a wall (narrow places such as the mine): swing the camera up and over the player instead of pushing it into the wall
@@ -104,8 +128,35 @@ namespace ItemCollector3D.Player
             transform.rotation = rotation;
         }
 
+        private float SwingComfort => Mathf.Min(swingComfortDistance, EffectiveDistance);
+
+        /// <summary>The smallest yaw change (degrees, either side) after which the orbit has at least the comfortable free distance; 0 when none does.</summary>
+        private float OpenYawOffset(Vector3 pivot)
+        {
+            float comfort = SwingComfort;
+            for (int step = 1; step <= 9; step++)
+            {
+                float offset = step * 20f;
+                float freeLeft = FreeDistanceAtYaw(pivot, yaw + offset);
+                float freeRight = FreeDistanceAtYaw(pivot, yaw - offset);
+                if (freeLeft >= comfort || freeRight >= comfort)
+                {
+                    return freeLeft >= freeRight ? offset : -offset;
+                }
+            }
+
+            return 0f;
+        }
+
+        private float FreeDistanceAtYaw(Vector3 pivot, float yawDegrees)
+        {
+            ResolveCollisionDistance(pivot, Quaternion.Euler(pitch, yawDegrees, 0f) * Vector3.back, out float free);
+            return free;
+        }
+
         private void ReadOrbitInput()
         {
+            orbitInputActive = false;
             if (GamePause.IsPaused)
             {
                 return; // the orbit reads raw input without deltaTime, so it must be stopped explicitly while paused
@@ -115,6 +166,7 @@ namespace ItemCollector3D.Player
 
             if (Mouse.current != null && Mouse.current.rightButton.isPressed)
             {
+                orbitInputActive = true;
                 Vector2 delta = Mouse.current.delta.ReadValue();
                 yaw += delta.x * mouseSensitivity * sensitivityScale;
                 pitch -= delta.y * mouseSensitivity * sensitivityScale;
@@ -151,6 +203,7 @@ namespace ItemCollector3D.Player
 
                 if (touch.press.isPressed)
                 {
+                    orbitInputActive = true;
                     Vector2 delta = touch.delta.ReadValue();
                     yaw += delta.x * touchSensitivity * sensitivityScale;
                     pitch -= delta.y * touchSensitivity * sensitivityScale;

@@ -398,6 +398,52 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Camera_SwingsOffTheWall_InsteadOfSqueezingTheHeadOntoTheScreen_ForBothMiners()
+        {
+            foreach (string miner in new[] { CharacterSelection.MaleId, CharacterSelection.FemaleId })
+            {
+                CharacterSelection.Select(miner);
+                yield return LoadScene();
+                Transform player = Player;
+                Camera camera = Camera.main;
+                var so = new SerializedObject(camera.GetComponent<ThirdPersonCameraController>());
+                so.FindProperty("pitch").floatValue = 18f;
+                Assert.That(so.FindProperty("swingComfortDistance").floatValue, Is.GreaterThan(2f), "the swing is switched on in the scene (a zero would silently disable it)");
+
+                // the player stands 1.2-1.3 m from a wall (or just in front of the crystals) with the orbit pointing at it: (x, z, camera yaw)
+                var cases = new[]
+                {
+                    (5.2f, 20.0f, 90f), (7.4f, 20.0f, 270f), (5.2f, 22.5f, 90f), (7.4f, 17.5f, 270f), (6.3f, 33.0f, 180f), (3.6f, 28.0f, 90f),
+                };
+                foreach ((float x, float z, float yaw) c in cases)
+                {
+                    so.FindProperty("yaw").floatValue = c.yaw;
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                    Teleport(player, new Vector3(c.x, 1.3f, c.z));
+                    yield return new WaitForSecondsRealtime(1.4f);
+
+                    Vector3 pivot = player.position + new Vector3(0f, 1.4f, 0f);
+                    float distance = Vector3.Distance(camera.transform.position, pivot);
+                    string where = $"{miner} at ({c.x}, {c.z}) with the orbit pointing at the wall (yaw {c.yaw}), camera at {camera.transform.position}";
+                    Assert.That(distance, Is.GreaterThan(2.3f), "the helmet does not fill the screen: " + where);
+                    foreach (Collider hit in Physics.OverlapSphere(camera.transform.position, 0.12f, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        Assert.That(hit.transform.IsChildOf(player), Is.True, $"the camera is not inside {hit.name}: " + where);
+                    }
+
+                    if (Physics.Linecast(camera.transform.position, pivot, out RaycastHit blocker, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        Assert.That(blocker.transform.IsChildOf(player), Is.True, $"nothing between the camera and the player ({blocker.collider.name}): " + where);
+                    }
+                }
+
+                yield return SceneManager.UnloadSceneAsync(scene);
+                scene = default;
+                yield return null;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator Camera_PullsInInsideTheMine_AndIsRestoredOutside()
         {
             yield return LoadScene();

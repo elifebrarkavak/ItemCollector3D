@@ -27,6 +27,9 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private string areaId = "green_mine";
         [Tooltip("Seconds between pressing DIG and the treasure being revealed (Concept Document: short interactions). 0 = reveal instantly.")]
         [SerializeField, Min(0f)] private float digDuration = 0.45f;
+        [Tooltip("DIG only starts inside the dig radius, but a dig already under way is cancelled only when the player is this much further away, so a single step " +
+                 "or a nudge from the character controller at the edge of the radius does not silently throw the dig away.")]
+        [SerializeField, Min(0f)] private float digLeaveMargin = 0.6f;
 
         // DIG button: 0 = hidden, 1 = ready, 2 = busy (visible but disabled while digging).
         private int digButtonMode = -1;
@@ -262,7 +265,7 @@ namespace ItemCollector3D.Treasure
                 return true; // nothing to measure: do not cancel
             }
 
-            return spot.HorizontalDistanceTo(player.position) <= spot.Definition.DigRadius;
+            return spot.HorizontalDistanceTo(player.position) <= spot.Definition.DigRadius + digLeaveMargin;
         }
 
         private void CancelDig()

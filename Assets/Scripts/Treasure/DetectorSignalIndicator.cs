@@ -56,6 +56,18 @@ namespace ItemCollector3D.Treasure
         private float flashStrength;
         private AudioClip beep;
         private int appliedLevel = -1;
+        private TMP_Text hintLabel;
+        private TreasureHuntController hunt;
+        private float cancelHintUntil;
+
+        public const string GetCloserHint = "GET CLOSER TO DIG";
+        public const string DigCancelledHint = "TOO FAR - STAY CLOSE TO DIG";
+
+        /// <summary>RAPID means "close", not "dig now": DIG is offered only inside the dig radius (<see cref="TreasureDetector.Proximity"/> reaches 1 there).</summary>
+        public static bool IsInsideDigRange(float proximity) => proximity >= 0.999f;
+
+        /// <summary>The short hint shown under the signal plate: empty when there is nothing to explain.</summary>
+        public string Hint => hintLabel != null && hintLabel.gameObject.activeSelf ? hintLabel.text : string.Empty;
 
         public int PulseCount { get; private set; }
 
@@ -110,7 +122,85 @@ namespace ItemCollector3D.Treasure
                 flashGraphic.color = idleColor;
             }
 
+            CreateHintLabel();
             ApplyLevel(SignalLevel.None);
+        }
+
+        private void Start()
+        {
+            hunt = FindAnyObjectByType<TreasureHuntController>();
+            if (hunt != null)
+            {
+                hunt.DigCancelled += HandleDigCancelled;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (hunt != null)
+            {
+                hunt.DigCancelled -= HandleDigCancelled;
+            }
+        }
+
+        private void HandleDigCancelled(TreasureSpot spot)
+        {
+            cancelHintUntil = Time.unscaledTime + 2.5f; // the player walked out of the dig range: say why nothing came out of the ground
+        }
+
+        private void CreateHintLabel()
+        {
+            if (label == null || hintLabel != null)
+            {
+                return;
+            }
+
+            hintLabel = Instantiate(label, transform);
+            hintLabel.name = "HintLabel";
+            var rect = hintLabel.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -8f);
+            rect.sizeDelta = new Vector2(Mathf.Max(420f, ((RectTransform)transform).rect.width * 1.5f), 48f);
+            rect.localScale = Vector3.one;
+            hintLabel.enableAutoSizing = false;
+            hintLabel.fontSize = Mathf.Max(18f, label.fontSize * 0.72f);
+            hintLabel.alignment = TextAlignmentOptions.Center;
+            hintLabel.textWrappingMode = TextWrappingModes.NoWrap;
+            hintLabel.raycastTarget = false;
+            hintLabel.gameObject.SetActive(false);
+        }
+
+        private void RefreshHint()
+        {
+            if (hintLabel == null)
+            {
+                return;
+            }
+
+            string text = string.Empty;
+            Color color = rapidColor;
+            if (Time.unscaledTime < cancelHintUntil)
+            {
+                text = DigCancelledHint;
+            }
+            else if (detector != null && Level == SignalLevel.Rapid && !IsInsideDigRange(detector.Proximity))
+            {
+                text = GetCloserHint;
+                color = fastColor;
+            }
+
+            bool show = text.Length > 0;
+            if (hintLabel.gameObject.activeSelf != show)
+            {
+                hintLabel.gameObject.SetActive(show);
+            }
+
+            if (show)
+            {
+                hintLabel.text = text;
+                hintLabel.color = color;
+            }
         }
 
         private void OnEnable()
@@ -148,6 +238,8 @@ namespace ItemCollector3D.Treasure
             {
                 ApplyLevel(LevelFor(detector.HasSignal, detector.Proximity));
             }
+
+            RefreshHint();
         }
 
         private void ApplyLevel(SignalLevel level)
