@@ -6,7 +6,8 @@ namespace ItemCollector3D.World
     /// <summary>
     /// Gameplay side of the Green Mine interior (the art lives under GreenMineEnvironment/MineInterior and holds no scripts). While the player is in or at
     /// the mouth of the tunnel / treasure room the third-person camera orbits closer (and cannot be squeezed into the player's head), and while the camera is
-    /// inside the sky light, fog and sun fade to a warm underground mood. Everything is restored on the way out.
+    /// inside the sky (ambient) light fades to a warm, dim underground tone; the lanterns and the sun shadowed by the tunnel shell do the rest. The sun and
+    /// the fog are never touched, so the daylight seen through the mouth stays daylight. The ambient is restored exactly on the way out.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MineInteriorZone : MonoBehaviour
@@ -20,21 +21,15 @@ namespace ItemCollector3D.World
         [SerializeField, Range(0.3f, 1f)] private float cameraDistanceScale = 0.7f;
         [SerializeField, Min(0f)] private float cameraMinimumDistance = 1.3f;
 
-        [Header("Mood")]
-        [SerializeField] private Color ambientSky = new(0.46f, 0.32f, 0.21f);
-        [SerializeField] private Color ambientEquator = new(0.40f, 0.28f, 0.18f);
-        [SerializeField] private Color ambientGround = new(0.22f, 0.14f, 0.09f);
-        [SerializeField] private Color fogColor = new(0.10f, 0.07f, 0.05f);
-        [SerializeField, Min(0f)] private float fogStart = 4f;
-        [SerializeField, Min(0.1f)] private float fogEnd = 34f;
-        [SerializeField, Range(0f, 1f)] private float sunScale = 0.12f;
-        [SerializeField, Min(0.05f)] private float fadeSeconds = 0.4f;
+        [Header("Mood (ambient only: the sun and the fog stay outdoor values)")]
+        [SerializeField] private Color ambientSky = new(0.56f, 0.44f, 0.34f);
+        [SerializeField] private Color ambientEquator = new(0.46f, 0.35f, 0.26f);
+        [SerializeField] private Color ambientGround = new(0.24f, 0.17f, 0.11f);
+        [SerializeField, Min(0.05f)] private float fadeSeconds = 0.8f;
 
         private float cameraBlend;
         private float moodBlend;
-        private Color baseSky, baseEquator, baseGround, baseFog;
-        private float baseFogStart, baseFogEnd, baseSunIntensity;
-        private Light sun;
+        private Color baseSky, baseEquator, baseGround;
         private bool captured;
 
         /// <summary>0 outdoors .. 1 fully underground (the mood fade, driven by the camera position).</summary>
@@ -86,7 +81,6 @@ namespace ItemCollector3D.World
             if (captured)
             {
                 ApplyMood();
-                captured = false;
             }
         }
 
@@ -117,25 +111,23 @@ namespace ItemCollector3D.World
                 baseSky = RenderSettings.ambientSkyColor;
                 baseEquator = RenderSettings.ambientEquatorColor;
                 baseGround = RenderSettings.ambientGroundColor;
-                baseFog = RenderSettings.fogColor;
-                baseFogStart = RenderSettings.fogStartDistance;
-                baseFogEnd = RenderSettings.fogEndDistance;
-                sun = RenderSettings.sun;
-                baseSunIntensity = sun != null ? sun.intensity : 0f;
                 captured = true;
+            }
+
+            if (moodBlend <= 0f)
+            {
+                // fully outdoors again: write the captured values back verbatim and forget them, so the next visit captures whatever the outdoors is then
+                RenderSettings.ambientSkyColor = baseSky;
+                RenderSettings.ambientEquatorColor = baseEquator;
+                RenderSettings.ambientGroundColor = baseGround;
+                captured = false;
+                return;
             }
 
             float t = moodBlend * moodBlend * (3f - 2f * moodBlend);
             RenderSettings.ambientSkyColor = Color.Lerp(baseSky, ambientSky, t);
             RenderSettings.ambientEquatorColor = Color.Lerp(baseEquator, ambientEquator, t);
             RenderSettings.ambientGroundColor = Color.Lerp(baseGround, ambientGround, t);
-            RenderSettings.fogColor = Color.Lerp(baseFog, fogColor, t);
-            RenderSettings.fogStartDistance = Mathf.Lerp(baseFogStart, fogStart, t);
-            RenderSettings.fogEndDistance = Mathf.Lerp(baseFogEnd, fogEnd, t);
-            if (sun != null)
-            {
-                sun.intensity = Mathf.Lerp(baseSunIntensity, baseSunIntensity * sunScale, t);
-            }
         }
     }
 }

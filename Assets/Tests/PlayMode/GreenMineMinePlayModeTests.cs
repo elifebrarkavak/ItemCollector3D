@@ -194,7 +194,8 @@ namespace ItemCollector3D.Tests.PlayMode
             public int Frames, CameraInside, PlayerHidden;
             public string FirstInside = "", FirstHidden = "";
             public float MinMineCameraDistance = float.MaxValue, MinY = float.MaxValue, MaxY = float.MinValue, MaxMood;
-            public bool ReachedRoom, ReachedTunnelEnd;
+            public bool ReachedRoom, ReachedTunnelEnd, DimAmbientSeen;
+            public int GlobalLightTouched;
         }
 
         private IEnumerator WalkRoute(string miner, float yaw, Stats stats)
@@ -213,8 +214,8 @@ namespace ItemCollector3D.Tests.PlayMode
             so.FindProperty("pitch").floatValue = 18f;
             so.ApplyModifiedPropertiesWithoutUndo();
 
-            Color sky = RenderSettings.ambientSkyColor, fog = RenderSettings.fogColor;
-            float sun = RenderSettings.sun.intensity;
+            Color sky = RenderSettings.ambientSkyColor, equator = RenderSettings.ambientEquatorColor, ground = RenderSettings.ambientGroundColor, fog = RenderSettings.fogColor;
+            float sun = RenderSettings.sun.intensity, fogStart = RenderSettings.fogStartDistance, fogEnd = RenderSettings.fogEndDistance;
 
             Teleport(player, new Vector3(AxisX, 1.3f, 10.5f));
             for (int i = 0; i < 30; i++)
@@ -257,6 +258,15 @@ namespace ItemCollector3D.Tests.PlayMode
                     stats.MinY = Mathf.Min(stats.MinY, pos.y);
                     stats.MaxY = Mathf.Max(stats.MaxY, pos.y);
                     stats.MaxMood = Mathf.Max(stats.MaxMood, zone.MoodBlend);
+                    if (RenderSettings.sun.intensity != sun || RenderSettings.fogColor != fog || RenderSettings.fogStartDistance != fogStart || RenderSettings.fogEndDistance != fogEnd)
+                    {
+                        stats.GlobalLightTouched++; // the daylight seen through the mouth must stay daylight: no global sun / fog change
+                    }
+
+                    if (zone.MoodBlend > 0.95f)
+                    {
+                        stats.DimAmbientSeen |= RenderSettings.ambientSkyColor.grayscale < sky.grayscale * 0.8f;
+                    }
                     stats.ReachedTunnelEnd |= pos.z > 25f;
                     stats.ReachedRoom |= pos.z > 29f && Mathf.Abs(pos.x - AxisX) < 3.7f;
 
@@ -301,9 +311,11 @@ namespace ItemCollector3D.Tests.PlayMode
 
             Assert.That(zone.MoodBlend, Is.Zero, $"outside again ({miner}, yaw {yaw}): no underground mood left, camera at {camera.transform.position}");
             Assert.That(zone.CameraBlend, Is.Zero, "outside again: the camera orbit is back to normal");
-            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(sky), "the sky light is restored");
-            Assert.That(RenderSettings.fogColor, Is.EqualTo(fog), "the fog is restored");
-            Assert.That(RenderSettings.sun.intensity, Is.EqualTo(sun).Within(0.001f), "the sun is restored");
+            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(sky), "the sky light is restored exactly");
+            Assert.That(RenderSettings.ambientEquatorColor, Is.EqualTo(equator), "the equator light is restored exactly");
+            Assert.That(RenderSettings.ambientGroundColor, Is.EqualTo(ground), "the ground light is restored exactly");
+            Assert.That(RenderSettings.fogColor, Is.EqualTo(fog), "the fog is untouched");
+            Assert.That(RenderSettings.sun.intensity, Is.EqualTo(sun), "the sun is untouched");
             Assert.That(player.position.z, Is.LessThan(13.5f), "back on the apron");
             yield return SceneManager.UnloadSceneAsync(scene);
             scene = default;
@@ -328,10 +340,61 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(s.MinY, Is.GreaterThan(0.9f), "the player never sinks into the floor");
                 Assert.That(s.MaxY, Is.LessThan(1.7f), "the player never climbs onto crates, rocks or crystals");
                 Assert.That(s.MaxMood, Is.GreaterThan(0.95f), "the underground mood reaches full strength inside");
+                Assert.That(s.DimAmbientSeen, Is.True, "the sky light is dimmed to a warm underground tone inside");
+                Assert.That(s.GlobalLightTouched, Is.Zero, "the sun and the fog never change on the way through the mine (outdoors stays daylight)");
                 all.Frames += s.Frames;
             }
 
             Assert.That(all.Frames, Is.GreaterThan(300));
+        }
+
+        [UnityTest]
+        public IEnumerator Lighting_SurvivesPauseAndResume_InsideAndWhileLeavingTheMine()
+        {
+            yield return LoadScene();
+            Transform player = Player;
+            var zone = Root("GameplaySystems").GetComponentInChildren<MineInteriorZone>(true);
+            var so = new SerializedObject(Camera.main.GetComponent<ThirdPersonCameraController>());
+            so.FindProperty("yaw").floatValue = 0f;
+            so.FindProperty("pitch").floatValue = 18f;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            Color outdoorSky = RenderSettings.ambientSkyColor, outdoorEquator = RenderSettings.ambientEquatorColor, fog = RenderSettings.fogColor;
+            float sun = RenderSettings.sun.intensity;
+
+            Teleport(player, new Vector3(AxisX, 1.3f, 20.5f));
+            yield return new WaitForSecondsRealtime(1.8f);
+            Assert.That(zone.MoodBlend, Is.GreaterThan(0.95f), "inside the tunnel");
+            Color inside = RenderSettings.ambientSkyColor;
+            Assert.That(inside.grayscale, Is.LessThan(outdoorSky.grayscale * 0.8f), "dim, warm ambient underground");
+
+            GamePause.Pause();
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(inside), "paused inside: the mood stays as it was");
+            GamePause.Resume();
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(inside), "resumed inside: still the underground mood");
+
+            Teleport(player, new Vector3(-1.4f, 1.2f, 0.4f)); // out in the open: the mood fades away
+            float waited = 0f;
+            while ((zone.MoodBlend <= 0.05f || zone.MoodBlend >= 0.95f) && waited < 3f)
+            {
+                waited += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            Assert.That(zone.MoodBlend, Is.InRange(0.05f, 0.95f), "caught the fade half way");
+            GamePause.Pause();
+            Color halfWay = RenderSettings.ambientSkyColor;
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(halfWay), "paused mid-fade: nothing moves");
+            GamePause.Resume();
+            yield return new WaitForSecondsRealtime(1.8f);
+
+            Assert.That(zone.MoodBlend, Is.Zero, "outdoors again");
+            Assert.That(RenderSettings.ambientSkyColor, Is.EqualTo(outdoorSky), "the original sky light is back exactly");
+            Assert.That(RenderSettings.ambientEquatorColor, Is.EqualTo(outdoorEquator));
+            Assert.That(RenderSettings.fogColor, Is.EqualTo(fog), "the fog was never touched");
+            Assert.That(RenderSettings.sun.intensity, Is.EqualTo(sun), "the sun was never touched");
         }
 
         [UnityTest]
