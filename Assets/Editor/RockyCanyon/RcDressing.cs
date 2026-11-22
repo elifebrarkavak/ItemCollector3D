@@ -224,8 +224,26 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
         }
 
+        /// <summary>
+        /// Structures the miner walks past (shacks, towers, posts, the crane, the flag pole ...) block only their lowest 2 m: the orbiting camera's ray starts 2.45 m above the feet, so a taller
+        /// collider next to a path would squeeze or swallow the camera (found by the stage 15C walking tour). Their meshes keep their full height; the colliders just stop at 2 m.
+        /// </summary>
+        private static readonly HashSet<string> LowColliders = new()
+        {
+            "MinerShack", "SupplyShed", "SignPostL", "SignPostR", "HeadframeLegs", "MineEntrance", "CraneMast", "SignalPost", "FlagPole", "Saguaro",
+        };
+
+        public const float LowColliderHeight = 2.0f;
+
         private static void Box(Transform cols, string name, Vector3 centre, Vector3 size, float yaw = 0f, float pitch = 0f, float roll = 0f)
         {
+            if (LowColliders.Contains(name) && pitch == 0f && roll == 0f && size.y > LowColliderHeight)
+            {
+                float bottom = centre.y - size.y * 0.5f;
+                size.y = LowColliderHeight;
+                centre.y = bottom + LowColliderHeight * 0.5f;
+            }
+
             var go = new GameObject(name);
             go.transform.SetParent(cols, false);
             go.transform.SetPositionAndRotation(centre, Quaternion.Euler(pitch, yaw, roll));
@@ -234,6 +252,14 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
 
         private static void Ball(Transform cols, string name, Vector3 centre, float radius)
         {
+            // like the boxes above: a sphere never reaches higher than 2 m over the ground it stands on (the bottom stays where it was)
+            float over = centre.y + radius - G(centre.x, centre.z) - LowColliderHeight;
+            if (over > 0f && radius - over * 0.5f > 0.5f)
+            {
+                radius -= over * 0.5f;
+                centre.y -= over * 0.5f;
+            }
+
             var go = new GameObject(name);
             go.transform.SetParent(cols, false);
             go.transform.position = centre;
