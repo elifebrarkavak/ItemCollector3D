@@ -177,14 +177,23 @@ namespace ItemCollector3D.Tests.PlayMode
 
             Assert.That(lights, Is.InRange(3, 8), "few lights");
 
-            // no new collectible: the existing treasure points are all outside the interior
+            // the mine holds exactly three treasures (two Epic in the room, one Rare in the tunnel); they live under TreasureSpots, never inside the art,
+            // and the original eight treasure points are all outside the interior
+            int underground = 0;
             foreach (TreasureSpot spot in Root("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true))
             {
                 Vector3 p = spot.transform.position;
-                Assert.That(p.x > 1.5f && p.x < 11.5f && p.z > 14.5f, Is.False, spot.name + " stays where it was");
+                bool inside = p.x > 1.5f && p.x < 11.5f && p.z > 14.5f;
+                Assert.That(inside, Is.EqualTo(spot.SpotId.Contains("mine_room") || spot.SpotId.Contains("mine_tunnel")), spot.name + " is underground only when it is a mine treasure");
+                if (inside)
+                {
+                    underground++;
+                }
             }
 
-            Assert.That(Root("TreasureSpots").transform.childCount, Is.InRange(6, 8));
+            Assert.That(underground, Is.EqualTo(3));
+            Assert.That(interior.GetComponentsInChildren<TreasureSpot>(true).Length, Is.Zero, "the interior art holds no treasure component");
+            Assert.That(Root("TreasureSpots").transform.childCount, Is.EqualTo(15));
         }
 
         // ================================================================ walking in and out with the real controller and camera

@@ -158,7 +158,8 @@ namespace ItemCollector3D.Tests.PlayMode
                 {
                     float a = i / 12f * Mathf.PI * 2f;
                     Vector3 p = centre + new Vector3(Mathf.Cos(a) * radius, 0f, Mathf.Sin(a) * radius);
-                    if (Physics.Raycast(p + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 20f, ~0, QueryTriggerInteraction.Ignore)
+                    // the ray starts 3 m above the treasure: under the ceiling of the tunnel and the treasure room, not on top of the mountain
+                    if (Physics.Raycast(new Vector3(p.x, centre.y + 3f, p.z), Vector3.down, out RaycastHit hit, 20f, ~0, QueryTriggerInteraction.Ignore)
                         && !Physics.CheckCapsule(hit.point + Vector3.up * 0.6f, hit.point + Vector3.up * 1.5f, 0.45f, ~0, QueryTriggerInteraction.Ignore))
                     {
                         return hit.point + Vector3.up * 1.1f;
@@ -240,7 +241,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
             // ... and the gameplay roots hold no environment art
             Assert.That(systems.GetComponentsInChildren<MeshRenderer>(true).Length, Is.LessThanOrEqualTo(0), "no scenery in GameplaySystems");
-            Assert.That(spots.transform.childCount, Is.InRange(6, 8), "6-8 temporary treasure points");
+            Assert.That(spots.transform.childCount, Is.EqualTo(15), "the fifteen treasure points of Green Mine");
             foreach (TreasureSpot spot in All<TreasureSpot>())
             {
                 Assert.That(spot.transform.IsChildOf(spots.transform), Is.True, spot.name + " must live under TreasureSpots");
@@ -305,24 +306,38 @@ namespace ItemCollector3D.Tests.PlayMode
             {
                 foreach (Transform crystal in crystals)
                 {
+                    if (crystal.GetComponentInChildren<MeshRenderer>(true) == null)
+                    {
+                        continue; // a light or a collider helper named after the crystals it serves: nothing to mistake for a treasure
+                    }
+
                     Vector3 d = crystal.position - spot.transform.position;
                     d.y = 0f;
-                    Assert.That(d.magnitude, Is.GreaterThan(3.0f), $"decorative {crystal.name} is clearly apart from the treasure point {spot.SpotId}");
+                    bool onTheWall = crystal.position.y > 0.8f; // the small wall crystals of the mine, high above the floor the treasure lies in
+                    Assert.That(d.magnitude, Is.GreaterThan(onTheWall ? 1.5f : 3.0f), $"decorative {crystal.name} is clearly apart from the treasure point {spot.SpotId}");
                 }
             }
         }
 
         // ================================================================ treasure data
 
+        // the eight treasures of the first Green Mine layout: their ids and rewards never change (they are in players' saves)
+        private static readonly (string id, int gold)[] OriginalTreasures =
+        {
+            ("green_mine.mine_01", 100), ("green_mine.rocky_01", 25), ("green_mine.meadow_01", 10), ("green_mine.rocky_02", 50),
+            ("green_mine.forest_01", 10), ("green_mine.forest_02", 25), ("green_mine.riverbank_01", 25), ("green_mine.rocky_03", 10),
+        };
+
         [UnityTest]
-        public IEnumerator TreasureSpots_HaveUniquePersistentIds_AndDoNotCompleteTheGoal()
+        public IEnumerator TreasureSpots_FifteenUniqueIds_SixHundredTwentyFiveGold_AndTheOriginalEightAreUntouched()
         {
             yield return LoadScene();
             TreasureSpot[] spots = All<TreasureSpot>();
-            Assert.That(spots.Length, Is.InRange(6, 8));
+            Assert.That(spots.Length, Is.EqualTo(15), "eight original + seven new treasures");
 
             var seen = new HashSet<string>();
             int total = 0;
+            var byRarity = new Dictionary<TreasureRarity, int>();
             foreach (TreasureSpot spot in spots)
             {
                 Assert.That(spot.HasExplicitId, Is.True, spot.name + " needs an explicit, position-independent id");
@@ -331,18 +346,53 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(seen.Add(spot.SpotId), Is.True, "duplicate id " + spot.SpotId);
                 Assert.That(spot.Definition, Is.Not.Null);
                 Assert.That(spot.Definition.Validate(out string error), Is.True, error);
+                Assert.That(spot.State, Is.EqualTo(TreasureState.Hidden), spot.SpotId + " starts buried");
+                Assert.That(spot.transform.childCount, Is.GreaterThan(0));
+                Assert.That(spot.transform.GetChild(0).gameObject.activeSelf, Is.False, spot.SpotId + " is not visible before it is dug up");
                 total += spot.Definition.GoldValue;
+                byRarity[spot.Definition.Rarity] = byRarity.TryGetValue(spot.Definition.Rarity, out int n) ? n + 1 : 1;
             }
 
             Assert.That(TreasureIdValidator.Validate(spots).IsValid, Is.True);
-            var catalog = AreaCatalog.CreateDefault();
-            Assert.That(total, Is.LessThan(catalog.Get("green_mine").goalTotalGold), "the temporary points must not complete the 500 gold goal artificially");
-            Assert.That(total, Is.GreaterThan(100), "but there is real gold to find");
-            Debug.Log($"GreenMine temporary treasure: {spots.Length} points, {total} gold in total (goal {catalog.Get("green_mine").goalTotalGold}).");
+            foreach ((string id, int gold) original in OriginalTreasures)
+            {
+                TreasureSpot spot = Spot(original.id);
+                Assert.That(spot.Definition.GoldValue, Is.EqualTo(original.gold), original.id + " keeps its reward");
+            }
+
+            int originalTotal = 0;
+            foreach ((string id, int gold) original in OriginalTreasures)
+            {
+                originalTotal += original.gold;
+            }
+
+            Assert.That(originalTotal, Is.EqualTo(255));
+            Assert.That(total, Is.EqualTo(625), "255 + 370 new = 625 gold in Green Mine");
+            Assert.That(total, Is.GreaterThanOrEqualTo(AreaCatalog.CreateDefault().Get("green_mine").goalTotalGold), "the goal of 500 can be reached");
+            Assert.That(byRarity[TreasureRarity.Epic], Is.EqualTo(3), "mine_01 + the two Epic treasures of the treasure room");
+
+            // the seven new ones: id, reward and where they lie
+            (string id, int gold, TreasureRarity rarity)[] added =
+            {
+                ("green_mine.mine_room_01", 100, TreasureRarity.Epic), ("green_mine.mine_room_02", 100, TreasureRarity.Epic), ("green_mine.mine_tunnel_01", 50, TreasureRarity.Rare),
+                ("green_mine.forest_03", 50, TreasureRarity.Rare), ("green_mine.rocky_04", 50, TreasureRarity.Rare),
+                ("green_mine.camp_01", 10, TreasureRarity.Common), ("green_mine.bridge_01", 10, TreasureRarity.Common),
+            };
+            int addedTotal = 0;
+            foreach ((string id, int gold, TreasureRarity rarity) a in added)
+            {
+                TreasureSpot spot = Spot(a.id);
+                Assert.That(spot.Definition.GoldValue, Is.EqualTo(a.gold), a.id);
+                Assert.That(spot.Definition.Rarity, Is.EqualTo(a.rarity), a.id);
+                addedTotal += a.gold;
+            }
+
+            Assert.That(addedTotal, Is.EqualTo(370));
+            Debug.Log($"GreenMine treasure: {spots.Length} points, {total} gold in total (goal {AreaCatalog.CreateDefault().Get("green_mine").goalTotalGold}).");
         }
 
         [UnityTest]
-        public IEnumerator EveryTreasure_CanBeDetected_Dug_AndCollected_AndSavedOnce_WithoutCompletingTheArea()
+        public IEnumerator EveryTreasure_CanBeDetected_Dug_AndCollected_AndSavedOnce_AndTheGoalIsReachedAt500Gold()
         {
             var store = new MemoryProgressStore();
             yield return LoadScene(store);
@@ -371,10 +421,16 @@ namespace ItemCollector3D.Tests.PlayMode
                 expected += spot.Definition.GoldValue;
                 Assert.That(hunt.TotalGold, Is.EqualTo(expected), "gold after " + spot.SpotId);
                 Assert.That(Saved(store).collectedTreasureIds, Contains.Item(spot.SpotId), "the id is saved");
+
+                // the goal of 500 gold completes Green Mine and unlocks Rocky Canyon exactly when the total reaches it
+                ProgressService progress = Root("GameplaySystems").GetComponentInChildren<ProgressManager>(true).Service;
+                Assert.That(progress.IsAreaCompleted("green_mine"), Is.EqualTo(expected >= 500), $"Green Mine completion at {expected} gold");
+                Assert.That(progress.IsAreaUnlocked("rocky_canyon"), Is.EqualTo(expected >= 500), $"Rocky Canyon unlock at {expected} gold");
             }
 
             ProgressService service = Root("GameplaySystems").GetComponentInChildren<ProgressManager>(true).Service;
-            Assert.That(service.IsAreaCompleted("green_mine"), Is.False, "finding every temporary treasure does not complete Green Mine (goal 500)");
+            Assert.That(expected, Is.EqualTo(625), "every treasure in Green Mine");
+            Assert.That(service.IsAreaCompleted("green_mine"), Is.True, "all the treasure completes Green Mine (goal 500)");
             Assert.That(service.TotalGold, Is.EqualTo(expected));
 
             // collecting again pays nothing
@@ -617,6 +673,11 @@ namespace ItemCollector3D.Tests.PlayMode
 
             foreach (TreasureSpot spot in All<TreasureSpot>())
             {
+                if (spot.SpotId.Contains("mine_room") || spot.SpotId.Contains("mine_tunnel"))
+                {
+                    continue; // underground: this terrain grid does not cover the tunnel; the miners walk to them in GreenMineDigCollectRealUiPlayModeTests
+                }
+
                 Assert.That(NearReached(spot.transform.position, 2.0f), Is.True, $"{spot.SpotId} can be reached: a walkable cell lies within the dig range (2.5 m)");
             }
 
@@ -684,6 +745,11 @@ namespace ItemCollector3D.Tests.PlayMode
 
             foreach (TreasureSpot spot in All<TreasureSpot>())
             {
+                if (spot.SpotId.Contains("mine_room") || spot.SpotId.Contains("mine_tunnel"))
+                {
+                    continue; // underground: the terrain grid does not cover the tunnel; GreenMineTreasurePlacementPlayModeTests walks them with both miners
+                }
+
                 List<Vector3> route = grid.Route(player.position - Vector3.up * 1.1f, spot.transform.position);
                 Assert.That(route, Is.Not.Null, "a walkable route exists to " + spot.SpotId);
                 foreach (Vector3 cell in route)
@@ -734,7 +800,7 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             pc.ClearMoveInput();
-            Debug.Log($"GreenMine off-trail walk to all {All<TreasureSpot>().Length} treasure points: {frames} frames, min camera distance {minCamera:F2} m, camera closer than 3 m in {squeezed} frames ({100f * squeezed / Mathf.Max(1, frames):F1}%), camera inside a tree crown in {inFoliage} frames ({100f * inFoliage / Mathf.Max(1, frames):F1}%).");
+            Debug.Log($"GreenMine off-trail walk to the {All<TreasureSpot>().Length - 3} outdoor treasure points: {frames} frames, min camera distance {minCamera:F2} m, camera closer than 3 m in {squeezed} frames ({100f * squeezed / Mathf.Max(1, frames):F1}%), camera inside a tree crown in {inFoliage} frames ({100f * inFoliage / Mathf.Max(1, frames):F1}%).");
             Assert.That(inFoliage / (float)Mathf.Max(1, frames), Is.LessThan(0.12f), "the camera rarely ends up inside a tree crown");
             Assert.That(minCamera, Is.GreaterThan(1.2f), "the camera is never pushed into the player");
             Assert.That(squeezed / (float)Mathf.Max(1, frames), Is.LessThan(0.15f), "the camera is rarely squeezed by scenery while walking through the forest and rocks");

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
+using ItemCollector3D.Player;
 using ItemCollector3D.Progress;
 using ItemCollector3D.Treasure;
 using ItemCollector3D.UI;
@@ -310,7 +311,7 @@ namespace ItemCollector3D.Tests.PlayMode
             {
                 float a = i / 24f * Mathf.PI * 2f;
                 Vector3 p = spot.transform.position + new Vector3(Mathf.Cos(a) * distance, 0f, Mathf.Sin(a) * distance);
-                if (Physics.Raycast(p + Vector3.up * 5f, Vector3.down, out RaycastHit hit, 20f, ~0, QueryTriggerInteraction.Ignore)
+                if (Physics.Raycast(new Vector3(p.x, spot.transform.position.y + 3f, p.z), Vector3.down, out RaycastHit hit, 20f, ~0, QueryTriggerInteraction.Ignore)
                     && !Physics.CheckCapsule(hit.point + Vector3.up * 0.6f, hit.point + Vector3.up * 1.5f, 0.5f, ~0, QueryTriggerInteraction.Ignore))
                 {
                     return hit.point + Vector3.up * 1.1f;
@@ -390,6 +391,264 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(hunt.IsDigging, Is.False, "walking away cancels the dig");
             Assert.That(other.State, Is.EqualTo(TreasureState.Hidden));
             Assert.That(indicator.Hint, Is.EqualTo(DetectorSignalIndicator.DigCancelledHint), "the HUD says the player was too far");
+        }
+
+        // ================================================================ the fifteen treasures (stage 11)
+
+        private static readonly string[] NewTreasureIds =
+        {
+            "green_mine.mine_room_01", "green_mine.mine_room_02", "green_mine.mine_tunnel_01", "green_mine.forest_03",
+            "green_mine.rocky_04", "green_mine.camp_01", "green_mine.bridge_01",
+        };
+
+        // the shape of the developer's save at the start of this stage (seven treasures collected, 190 gold), copied into memory: the real file is never read
+        private const string SaveWith190Gold = "{\"version\":1,\"totalGold\":190,\"collectedTreasureIds\":[\"green_mine.gold_coin_01\",\"green_mine.meadow_01\",\"green_mine.riverbank_01\",\"green_mine.rocky_01\",\"green_mine.rocky_03\",\"green_mine.forest_01\",\"green_mine.mine_01\"],\"unlockedAreaIds\":[\"green_mine\"],\"completedAreaIds\":[]}";
+
+        // 450 gold: the three Epic treasures, two Rare ones and two Uncommon ones: one Rare treasure (50) from the 500 goal
+        private const string SaveWith450Gold = "{\"version\":1,\"totalGold\":450,\"collectedTreasureIds\":[\"green_mine.mine_01\",\"green_mine.mine_room_01\",\"green_mine.mine_room_02\",\"green_mine.rocky_02\",\"green_mine.mine_tunnel_01\",\"green_mine.forest_02\",\"green_mine.riverbank_01\"],\"unlockedAreaIds\":[\"green_mine\"],\"completedAreaIds\":[]}";
+
+        private IEnumerator DigAndCollectWithTheButtons(TreasureSpot spot, TreasureHuntController hunt)
+        {
+            Button dig = FindButton("DigButton");
+            Teleport(Player, PlaceAtDistance(spot, 1.5f));
+            yield return WaitUntil(() => dig.gameObject.activeInHierarchy && dig.interactable, 2f);
+            yield return new WaitForSecondsRealtime(0.25f);
+            Canvas.ForceUpdateCanvases();
+            Assert.That(dig.gameObject.activeInHierarchy, Is.True, "DIG is offered at " + spot.SpotId);
+            Assert.That(spot.transform.GetChild(0).gameObject.activeSelf, Is.False, spot.SpotId + " is still invisible before the dig");
+
+            int gold = hunt.TotalGold;
+            yield return Tap(Pointer.Mouse, ScreenCentre(dig));
+            yield return WaitUntil(() => spot.State != TreasureState.Hidden, 3f);
+            Assert.That(spot.State, Is.EqualTo(TreasureState.Revealed), "DIG reveals " + spot.SpotId);
+            Assert.That(spot.transform.GetChild(0).gameObject.activeSelf, Is.True, spot.SpotId + " shows up after the dig");
+
+            Button collect = FindButton("CollectButton");
+            yield return WaitUntil(() => collect.gameObject.activeInHierarchy && collect.interactable, 2f);
+            yield return new WaitForSecondsRealtime(0.25f);
+            Canvas.ForceUpdateCanvases();
+            yield return Tap(Pointer.Mouse, ScreenCentre(collect));
+            yield return WaitUntil(() => spot.State == TreasureState.Collected, 3f);
+            Assert.That(spot.State, Is.EqualTo(TreasureState.Collected), "COLLECT collects " + spot.SpotId);
+            Assert.That(hunt.TotalGold, Is.EqualTo(gold + spot.Definition.GoldValue), "the reward of " + spot.SpotId);
+        }
+
+        [UnityTest]
+        public IEnumerator TreasurePoints_AreFarEnoughApart_ThatTheirDigAndCollectAreasNeverOverlap()
+        {
+            yield return LoadScene(new MemoryProgressStore());
+            TreasureSpot[] spots = All<TreasureSpot>();
+            Assert.That(spots.Length, Is.EqualTo(15));
+            for (int i = 0; i < spots.Length; i++)
+            {
+                for (int j = i + 1; j < spots.Length; j++)
+                {
+                    float d = Vector3.Distance(spots[i].transform.position, spots[j].transform.position);
+                    // two treasures never share a dig area; the new ones are even placed so that DIG of one never shows while COLLECT of another is on offer
+                    // (the original eight keep their places, rocky_01 and rocky_02 among them, 5.46 m apart)
+                    bool isNew = System.Array.IndexOf(NewTreasureIds, spots[i].SpotId) >= 0 || System.Array.IndexOf(NewTreasureIds, spots[j].SpotId) >= 0;
+                    float needed = isNew ? spots[i].Definition.DigRadius + spots[j].Definition.CollectRadius : spots[i].Definition.DigRadius + spots[j].Definition.DigRadius;
+                    Assert.That(d, Is.GreaterThan(needed), $"{spots[i].SpotId} and {spots[j].SpotId} are {d:F2} m apart");
+                }
+            }
+
+            // the two Epic treasures of the treasure room sit inside the room volume, the tunnel treasure inside the tunnel
+            var room = new Bounds(new Vector3(6.3f, 2.5f, 31.5f), new Vector3(8f, 5f, 10f));
+            var tunnel = new Bounds(new Vector3(6.3f, 2.3f, 20.5f), new Vector3(4.6f, 4.6f, 12f));
+            Assert.That(room.Contains(Spot("green_mine.mine_room_01").transform.position + Vector3.up), Is.True);
+            Assert.That(room.Contains(Spot("green_mine.mine_room_02").transform.position + Vector3.up), Is.True);
+            Assert.That(tunnel.Contains(Spot("green_mine.mine_tunnel_01").transform.position + Vector3.up), Is.True);
+
+            // standing on a treasure point never collides with the mine's colliders (walls, crystals, props)
+            foreach (string id in new[] { "green_mine.mine_room_01", "green_mine.mine_room_02", "green_mine.mine_tunnel_01" })
+            {
+                Vector3 p = Spot(id).transform.position;
+                Assert.That(Physics.CheckCapsule(p + Vector3.up * 0.6f, p + Vector3.up * 1.5f, 0.45f, ~0, QueryTriggerInteraction.Ignore), Is.False, id + " is on open floor");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator EveryNewTreasure_IsDug_AndCollected_ThroughTheRealButtons_Once()
+        {
+            var store = new MemoryProgressStore();
+            yield return LoadScene(store);
+            var hunt = All<TreasureHuntController>()[0];
+            yield return new WaitForSecondsRealtime(1.5f); // the HUD slides in
+            Assert.That(hunt.TotalGold, Is.EqualTo(0));
+
+            int expected = 0;
+            foreach (string id in NewTreasureIds)
+            {
+                TreasureSpot spot = Spot(id);
+                yield return DigAndCollectWithTheButtons(spot, hunt);
+                expected += spot.Definition.GoldValue;
+                Assert.That(JsonUtility.FromJson<GameProgressData>(store.Json).collectedTreasureIds, Contains.Item(id), id + " is saved");
+            }
+
+            Assert.That(expected, Is.EqualTo(370));
+            Assert.That(hunt.TotalGold, Is.EqualTo(370), "the seven new treasures are worth 370 gold");
+            Assert.That(JsonUtility.FromJson<GameProgressData>(store.Json).totalGold, Is.EqualTo(370));
+
+            // collecting again pays nothing
+            Teleport(Player, PlaceAtDistance(Spot("green_mine.mine_room_01"), 1.5f));
+            yield return new WaitForSecondsRealtime(0.5f);
+            Button collect = FindButton("CollectButton");
+            Assert.That(collect.gameObject.activeInHierarchy, Is.False, "nothing left to collect");
+            collect.onClick.Invoke();
+            yield return null;
+            Assert.That(hunt.TotalGold, Is.EqualTo(370), "no double payment");
+        }
+
+        [UnityTest]
+        public IEnumerator ExistingSave_KeepsItsGold_NewRewardsAddUp_AndNothingPaysTwice_AfterAReload()
+        {
+            var store = new MemoryProgressStore(SaveWith190Gold);
+            yield return LoadScene(store);
+            var hunt = All<TreasureHuntController>()[0];
+            yield return new WaitForSecondsRealtime(1.5f);
+            Assert.That(hunt.TotalGold, Is.EqualTo(190), "the gold of the existing save is kept");
+            TreasureSpot oldSpot = Spot("green_mine.mine_01");
+            Assert.That(oldSpot.State, Is.EqualTo(TreasureState.Collected), "what was collected before stays collected");
+
+            // standing on an already collected treasure offers nothing
+            Teleport(Player, PlaceAtDistance(oldSpot, 1.5f));
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.That(FindButton("DigButton").gameObject.activeInHierarchy, Is.False, "no DIG on a treasure that was already collected");
+            Assert.That(FindButton("CollectButton").gameObject.activeInHierarchy, Is.False, "and no second reward");
+            Assert.That(hunt.TotalGold, Is.EqualTo(190));
+
+            TreasureSpot room = Spot("green_mine.mine_room_01");
+            yield return DigAndCollectWithTheButtons(room, hunt);
+            Assert.That(hunt.TotalGold, Is.EqualTo(290), "190 + the Epic treasure (100)");
+
+            // load the level again with the same save
+            yield return SceneManager.UnloadSceneAsync(scene);
+            scene = default;
+            yield return null;
+            yield return LoadScene(store);
+            hunt = All<TreasureHuntController>()[0];
+            Assert.That(hunt.TotalGold, Is.EqualTo(290), "the new reward was saved");
+            Assert.That(Spot("green_mine.mine_room_01").State, Is.EqualTo(TreasureState.Collected), "and its treasure stays collected");
+            Assert.That(Spot("green_mine.mine_01").State, Is.EqualTo(TreasureState.Collected));
+            Assert.That(Spot("green_mine.mine_room_02").State, Is.EqualTo(TreasureState.Hidden), "while the others are still buried");
+            Assert.That(JsonUtility.FromJson<GameProgressData>(store.Json).collectedTreasureIds, Does.Contain("green_mine.gold_coin_01"), "the old save's ids are still there");
+        }
+
+        [UnityTest]
+        public IEnumerator RockyCanyon_Unlocks_AndGreenMineCompletes_AtExactly500Gold()
+        {
+            var store = new MemoryProgressStore(SaveWith450Gold);
+            yield return LoadScene(store);
+            var hunt = All<TreasureHuntController>()[0];
+            ProgressService service = All<ProgressManager>()[0].Service;
+            yield return new WaitForSecondsRealtime(1.5f);
+            Assert.That(hunt.TotalGold, Is.EqualTo(450));
+            Assert.That(service.IsAreaUnlocked("rocky_canyon"), Is.False, "Rocky Canyon is locked below 500 gold");
+            Assert.That(service.IsAreaCompleted("green_mine"), Is.False);
+
+            string unlocked = null;
+            service.AreaUnlocked += id => unlocked = id;
+
+            yield return DigAndCollectWithTheButtons(Spot("green_mine.camp_01"), hunt); // +10: 460
+            Assert.That(service.IsAreaUnlocked("rocky_canyon"), Is.False, "460 gold is not enough");
+
+            yield return DigAndCollectWithTheButtons(Spot("green_mine.forest_03"), hunt); // +50: 510
+            Assert.That(hunt.TotalGold, Is.EqualTo(510));
+            Assert.That(service.IsAreaUnlocked("rocky_canyon"), Is.True, "500 gold unlocks Rocky Canyon by the existing rules");
+            Assert.That(unlocked, Is.EqualTo("rocky_canyon"));
+            Assert.That(service.IsAreaCompleted("green_mine"), Is.True, "and reaching the goal completes Green Mine");
+            Assert.That(JsonUtility.FromJson<GameProgressData>(store.Json).unlockedAreaIds, Does.Contain("rocky_canyon"), "saved");
+            Assert.That(service.IsAreaUnlocked("ancient_mine"), Is.False, "the next area needs 1200 gold");
+        }
+
+        private sealed class WalkStats
+        {
+            public int Frames;
+            public float MinY = float.MaxValue, MaxY = float.MinValue;
+        }
+
+        private IEnumerator WalkTo(Transform player, ThirdPersonPlayerController controller, Camera camera, Vector2 target, float stopAt, string label, WalkStats stats)
+        {
+            float legTime = 0f;
+            float legStart = Vector2.Distance(new Vector2(player.position.x, player.position.z), target);
+            while (true)
+            {
+                Vector3 delta = new Vector3(target.x - player.position.x, 0f, target.y - player.position.z);
+                if (delta.magnitude < stopAt)
+                {
+                    break;
+                }
+
+                legTime += Time.deltaTime;
+                Assert.That(legTime, Is.LessThan(legStart / 3.0f + 4f), $"stuck on the way to {label} at {player.position}");
+                Vector3 f = camera.transform.forward;
+                f.y = 0f;
+                f.Normalize();
+                Vector3 r = new(f.z, 0f, -f.x);
+                Vector3 d = delta.normalized;
+                controller.SetMoveInput(new Vector2(Vector3.Dot(d, r), Vector3.Dot(d, f)));
+                yield return null;
+                stats.Frames++;
+                stats.MinY = Mathf.Min(stats.MinY, player.position.y);
+                stats.MaxY = Mathf.Max(stats.MaxY, player.position.y);
+            }
+
+            controller.ClearMoveInput();
+        }
+
+        [UnityTest]
+        [RealisticFrameRate]
+        public IEnumerator BothMiners_WalkInto_TheTunnel_AndTheTreasureRoom_AndReachEveryUndergroundTreasure()
+        {
+            foreach (string miner in new[] { CharacterSelection.MaleId, CharacterSelection.FemaleId })
+            {
+                CharacterSelection.Select(miner);
+                yield return LoadScene(new MemoryProgressStore());
+                Time.timeScale = 2f;
+                Transform player = Player;
+                var controller = player.GetComponent<ThirdPersonPlayerController>();
+                Camera camera = Camera.main;
+                Button dig = FindButton("DigButton");
+                var stats = new WalkStats();
+                Teleport(player, new Vector3(6.3f, 1.3f, 10.5f));
+                yield return new WaitForSecondsRealtime(1.2f);
+
+                // outside -> mouth -> tunnel: the tunnel treasure
+                yield return WalkTo(player, controller, camera, new Vector2(6.3f, 17.0f), 0.9f, "the tunnel", stats);
+                TreasureSpot tunnelSpot = Spot("green_mine.mine_tunnel_01");
+                yield return WalkTo(player, controller, camera, new Vector2(tunnelSpot.transform.position.x, tunnelSpot.transform.position.z), 1.5f, tunnelSpot.SpotId, stats);
+                yield return WaitUntil(() => dig.gameObject.activeInHierarchy, 1f);
+                Assert.That(tunnelSpot.HorizontalDistanceTo(player.position), Is.LessThanOrEqualTo(tunnelSpot.Definition.DigRadius), miner + " stands in dig range of the tunnel treasure");
+                Assert.That(dig.gameObject.activeInHierarchy, Is.True, miner + ": DIG is offered in the tunnel");
+
+                // tunnel -> treasure room: both Epic treasures
+                yield return WalkTo(player, controller, camera, new Vector2(6.3f, 25.0f), 0.9f, "the end of the tunnel", stats);
+                yield return WalkTo(player, controller, camera, new Vector2(7.2f, 27.3f), 0.9f, "the room door", stats);
+                TreasureSpot roomB = Spot("green_mine.mine_room_02");
+                yield return WalkTo(player, controller, camera, new Vector2(roomB.transform.position.x, roomB.transform.position.z), 1.5f, roomB.SpotId, stats);
+                yield return WaitUntil(() => dig.gameObject.activeInHierarchy, 1f);
+                Assert.That(roomB.HorizontalDistanceTo(player.position), Is.LessThanOrEqualTo(roomB.Definition.DigRadius), miner + " stands in dig range of the second Epic treasure");
+                Assert.That(dig.gameObject.activeInHierarchy, Is.True);
+
+                yield return WalkTo(player, controller, camera, new Vector2(5.8f, 28.6f), 0.9f, "the middle of the room", stats);
+                TreasureSpot roomA = Spot("green_mine.mine_room_01");
+                yield return WalkTo(player, controller, camera, new Vector2(roomA.transform.position.x, roomA.transform.position.z), 1.5f, roomA.SpotId, stats);
+                yield return WaitUntil(() => dig.gameObject.activeInHierarchy, 1f);
+                Assert.That(roomA.HorizontalDistanceTo(player.position), Is.LessThanOrEqualTo(roomA.Definition.DigRadius), miner + " stands in dig range of the first Epic treasure");
+                Assert.That(dig.gameObject.activeInHierarchy, Is.True);
+
+                // and out again
+                yield return WalkTo(player, controller, camera, new Vector2(6.3f, 26.0f), 0.9f, "the room door (back)", stats);
+                yield return WalkTo(player, controller, camera, new Vector2(6.3f, 12.0f), 0.9f, "the apron", stats);
+                Assert.That(stats.MinY, Is.GreaterThan(0.9f), miner + " never sinks into the floor");
+                Assert.That(stats.MaxY, Is.LessThan(1.7f), miner + " never climbs onto a rock, crystal or crate");
+                Assert.That(stats.Frames, Is.GreaterThan(150));
+                Debug.Log($"GreenMine underground treasure walk ({miner}): {stats.Frames} frames, player y {stats.MinY:F2}..{stats.MaxY:F2}.");
+
+                yield return SceneManager.UnloadSceneAsync(scene);
+                scene = default;
+                yield return null;
+            }
         }
     }
 }
