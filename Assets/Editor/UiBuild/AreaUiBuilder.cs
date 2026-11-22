@@ -44,7 +44,7 @@ namespace ItemCollector3D.EditorTools
         private static readonly CardSpec[] Cards =
         {
             new CardSpec { Id = "green_mine", SceneName = SceneNavigator.GreenMineScene, Display = "GREEN MINE", Sprite = "area_green_mine" },
-            new CardSpec { Id = "rocky_canyon", SceneName = "", Display = "ROCKY CANYON", Sprite = "area_rocky_canyon" },
+            new CardSpec { Id = "rocky_canyon", SceneName = SceneNavigator.RockyCanyonScene, Display = "ROCKY CANYON", Sprite = "area_rocky_canyon" },
             new CardSpec { Id = "ancient_mine", SceneName = "", Display = "ANCIENT MINE", Sprite = "area_ancient_mine" },
         };
 

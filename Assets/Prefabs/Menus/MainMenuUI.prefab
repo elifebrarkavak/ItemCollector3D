@@ -11140,7 +11140,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Menus.AreaCardView
   areaId: rocky_canyon
-  sceneName: 
+  sceneName: RockyCanyon
   nameLabel: {fileID: 269808962060198429}
   goldLabel: {fileID: 6943793221419738278}
   captionLabel: {fileID: 8763609473293941573}

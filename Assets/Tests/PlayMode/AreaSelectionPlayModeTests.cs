@@ -478,7 +478,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Gold499_KeepsRockyCanyonLocked_Gold500_OpensItAsComingSoon()
+        public IEnumerator Gold499_KeepsRockyCanyonLocked_Gold500_OpensItAsPlayable()
         {
             yield return OpenAreaSelection(499);
             AreaSelectController screen = Find<AreaSelectController>("AreaPanel");
@@ -493,10 +493,16 @@ namespace ItemCollector3D.Tests.PlayMode
             UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("one_more", 1);
             Find<Button>("PlayButton").onClick.Invoke();
             yield return null;
-            Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.ComingSoon), "500 gold opens Rocky Canyon");
+            Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.Playable), "500 gold opens Rocky Canyon, which has its scene now");
             Assert.That(rocky.LockVisible, Is.False);
-            Assert.That(rocky.ComingSoonVisible, Is.True);
+            Assert.That(rocky.ComingSoonVisible, Is.False, "it is a real area now, not COMING SOON");
+            Assert.That(rocky.PlayButton.gameObject.activeSelf, Is.True, "it shows PLAY");
             Assert.That(Card(screen, "ancient_mine").State.Availability, Is.EqualTo(AreaAvailability.Locked), "Ancient Mine still needs 1200");
+
+            string requested = null;
+            SceneNavigator.LoadHook = name => requested = name;
+            rocky.PlayButton.onClick.Invoke();
+            Assert.That(requested, Is.EqualTo(SceneNavigator.RockyCanyonScene), "PLAY opens RockyCanyon.unity");
         }
 
         [UnityTest]
@@ -505,7 +511,7 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return OpenAreaSelection(1199);
             AreaSelectController screen = Find<AreaSelectController>("AreaPanel");
             AreaCardView ancient = Card(screen, "ancient_mine");
-            Assert.That(Card(screen, "rocky_canyon").State.Availability, Is.EqualTo(AreaAvailability.ComingSoon));
+            Assert.That(Card(screen, "rocky_canyon").State.Availability, Is.EqualTo(AreaAvailability.Playable));
             Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.Locked), "1199 gold is not enough");
             Assert.That(ancient.GoldLabel.text, Is.EqualTo("1 GOLD TO UNLOCK"), "one gold short");
 
@@ -521,6 +527,7 @@ namespace ItemCollector3D.Tests.PlayMode
         [UnityTest]
         public IEnumerator ComingSoon_LooksDifferentFromLocked_AndCannotBeEntered()
         {
+            // 500 gold: Rocky Canyon is playable, Ancient Mine is still locked
             yield return OpenAreaSelection(500);
             string requested = null;
             SceneNavigator.LoadHook = name => requested = name;
@@ -528,32 +535,41 @@ namespace ItemCollector3D.Tests.PlayMode
             AreaCardView rocky = Card(screen, "rocky_canyon");
             AreaCardView ancient = Card(screen, "ancient_mine");
 
-            // Rocky Canyon: open but no map yet -> full colour, UNLOCKED chip, COMING SOON banner and button, no padlock
-            Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.ComingSoon));
-            Assert.That(rocky.ComingSoonVisible, Is.True, "COMING SOON banner");
-            Assert.That(rocky.UnlockedVisible, Is.True, "UNLOCKED chip");
+            Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.Playable));
+            Assert.That(rocky.ComingSoonVisible, Is.False);
             Assert.That(rocky.LockVisible, Is.False, "no padlock: it is open");
-            Assert.That(rocky.ComingSoonButton.gameObject.activeSelf, Is.True);
-            Assert.That(rocky.ComingSoonButton.GetComponentInChildren<TMP_Text>().text, Is.EqualTo("COMING SOON"));
+            Assert.That(rocky.PlayButton.gameObject.activeSelf, Is.True, "it shows PLAY");
             Assert.That(rocky.transform.Find("Frame").GetComponent<Image>().color, Is.EqualTo(Color.white), "not faded: it is unlocked");
-            Assert.That(rocky.CompleteVisible, Is.False, "an area without a map is never shown as complete");
 
             // Ancient Mine: locked -> padlock, no banner
             Assert.That(ancient.LockVisible, Is.True);
             Assert.That(ancient.ComingSoonVisible, Is.False);
             Assert.That(ancient.UnlockedVisible, Is.False);
-
-            // neither can be entered, by button or by code
-            rocky.ComingSoonButton.onClick.Invoke();
             ancient.LockedButton.onClick.Invoke();
-            Assert.That(screen.TryEnter("rocky_canyon"), Is.EqualTo(AreaEnterResult.ComingSoon));
             Assert.That(screen.TryEnter("ancient_mine"), Is.EqualTo(AreaEnterResult.Locked));
             Assert.That(screen.TryEnter("no_such_area"), Is.EqualTo(AreaEnterResult.UnknownArea));
-            Assert.That(requested, Is.Null, "no scene was loaded");
-            Assert.That(rocky.IsDenyAnimationPlaying, Is.True, "a refused tap gives visible feedback");
+            Assert.That(requested, Is.Null, "a locked or unknown area loads nothing");
+            Assert.That(ancient.IsDenyAnimationPlaying, Is.True, "a refused tap gives visible feedback");
+
+            // 1200 gold: Ancient Mine is open but has no map yet -> full colour, UNLOCKED chip, COMING SOON banner and button, no padlock
+            Find<Button>("AreaBackButton").onClick.Invoke();
+            UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("more", 700);
+            Find<Button>("PlayButton").onClick.Invoke();
+            yield return null;
+            Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.ComingSoon));
+            Assert.That(ancient.ComingSoonVisible, Is.True, "COMING SOON banner");
+            Assert.That(ancient.UnlockedVisible, Is.True, "UNLOCKED chip");
+            Assert.That(ancient.LockVisible, Is.False, "no padlock: it is open");
+            Assert.That(ancient.ComingSoonButton.gameObject.activeSelf, Is.True);
+            Assert.That(ancient.ComingSoonButton.GetComponentInChildren<TMP_Text>().text, Is.EqualTo("COMING SOON"));
+            Assert.That(ancient.transform.Find("Frame").GetComponent<Image>().color, Is.EqualTo(Color.white), "not faded: it is unlocked");
+            Assert.That(ancient.CompleteVisible, Is.False, "an area without a map is never shown as complete");
+            ancient.ComingSoonButton.onClick.Invoke();
+            Assert.That(screen.TryEnter("ancient_mine"), Is.EqualTo(AreaEnterResult.ComingSoon));
+            Assert.That(requested, Is.Null, "COMING SOON loads nothing");
             Assert.That(ancient.IsDenyAnimationPlaying, Is.True);
 
-            // even with 2500 gold the two areas without a scene stay COMING SOON and never load anything
+            // even with 4000 gold the area without a scene stays COMING SOON and never loads anything
             Find<Button>("AreaBackButton").onClick.Invoke();
             UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("big", 3000);
             Find<Button>("PlayButton").onClick.Invoke();
