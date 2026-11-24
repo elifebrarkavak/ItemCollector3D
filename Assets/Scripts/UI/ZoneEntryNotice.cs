@@ -7,7 +7,7 @@ namespace ItemCollector3D.UI
 {
     /// <summary>
     /// "DESERT OUTPOST", "DRY RIVERBED" ...: a small banner (the existing <see cref="NotificationBanner"/> pop / hold / fade, a second instance placed under the HUD's top bar) shown for about
-    /// 2.4 seconds when the player enters a new exploration area of Rocky Canyon. It listens to <see cref="CanyonZoneTracker.ZoneEntered"/> and keeps itself out of the way:
+    /// 2.4 seconds when the player enters a new exploration area of Rocky Canyon or the Ancient Mine (stage 16D). It listens to <see cref="CanyonZoneTracker.ZoneEntered"/> or <see cref="MineZoneTracker.ZoneEntered"/> and keeps itself out of the way:
     /// it waits until the player has stayed in the new area for <see cref="DwellSeconds"/> (a quick step across a border shows nothing), never shows while the game is paused or a dig runs or
     /// while the progress banner (AREA COMPLETE / NEW AREA UNLOCKED) is up, never shows two banners closer than <see cref="MinimumGapSeconds"/>, and never repeats the same area within
     /// <see cref="RepeatCooldownSeconds"/>. The banner takes no touches. Without audio or save access: it only reads the tracker.
@@ -21,6 +21,8 @@ namespace ItemCollector3D.UI
         public const float GiveUpAfterSeconds = 10f;
 
         [SerializeField] private CanyonZoneTracker zones;
+        [Tooltip("The Ancient Mine's tracker (used instead of the canyon one in that scene).")]
+        [SerializeField] private MineZoneTracker mineZones;
         [SerializeField] private NotificationBanner banner;
         [Tooltip("The progress banner (AREA COMPLETE ...): a zone name waits while it is showing. Optional.")]
         [SerializeField] private NotificationBanner progressBanner;
@@ -29,7 +31,8 @@ namespace ItemCollector3D.UI
 
         private readonly float[] lastShown = { float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity };
         private bool hasPending;
-        private CanyonZone pending;
+        private int pending;
+        private string pendingName;
         private float pendingSince;
         private float lastBannerTime = float.NegativeInfinity;
 
@@ -43,9 +46,13 @@ namespace ItemCollector3D.UI
 
         private void Awake()
         {
-            if (zones == null)
+            if (zones == null && mineZones == null)
             {
                 zones = FindAnyObjectByType<CanyonZoneTracker>();
+                if (zones == null)
+                {
+                    mineZones = FindAnyObjectByType<MineZoneTracker>();
+                }
             }
 
             if (hunt == null)
@@ -58,10 +65,19 @@ namespace ItemCollector3D.UI
         {
             if (zones != null)
             {
-                zones.ZoneEntered += HandleEntered;
+                zones.ZoneEntered += HandleCanyonEntered;
                 if (zones.HasZone)
                 {
-                    HandleEntered(zones.Current);
+                    HandleCanyonEntered(zones.Current);
+                }
+            }
+
+            if (mineZones != null)
+            {
+                mineZones.ZoneEntered += HandleMineEntered;
+                if (mineZones.HasZone)
+                {
+                    HandleMineEntered(mineZones.Current);
                 }
             }
         }
@@ -70,14 +86,24 @@ namespace ItemCollector3D.UI
         {
             if (zones != null)
             {
-                zones.ZoneEntered -= HandleEntered;
+                zones.ZoneEntered -= HandleCanyonEntered;
+            }
+
+            if (mineZones != null)
+            {
+                mineZones.ZoneEntered -= HandleMineEntered;
             }
         }
 
-        private void HandleEntered(CanyonZone zone)
+        private void HandleCanyonEntered(CanyonZone zone) => HandleEntered((int)zone, CanyonZoneTracker.DisplayName(zone));
+
+        private void HandleMineEntered(MineZone zone) => HandleEntered((int)zone, MineZoneTracker.DisplayName(zone));
+
+        private void HandleEntered(int zone, string displayName)
         {
             hasPending = true;
             pending = zone;
+            pendingName = displayName;
             pendingSince = Time.unscaledTime;
         }
 
@@ -96,7 +122,7 @@ namespace ItemCollector3D.UI
             }
 
             // the player is no longer in the area that was entered (it was only a step across the border): forget it
-            if (zones != null && zones.HasZone && zones.Current != pending)
+            if ((zones != null && zones.HasZone && (int)zones.Current != pending) || (mineZones != null && mineZones.HasZone && (int)mineZones.Current != pending))
             {
                 return; // HandleEntered replaced the pending zone already; nothing else to do
             }
@@ -112,15 +138,15 @@ namespace ItemCollector3D.UI
             }
 
             hasPending = false;
-            if (now - lastShown[(int)pending] < RepeatCooldownSeconds)
+            if (now - lastShown[pending] < RepeatCooldownSeconds)
             {
                 return;
             }
 
-            lastShown[(int)pending] = now;
+            lastShown[pending] = now;
             lastBannerTime = now;
             ShownCount++;
-            banner.Show(CanyonZoneTracker.DisplayName(pending), string.Empty, color);
+            banner.Show(pendingName, string.Empty, color);
         }
     }
 }

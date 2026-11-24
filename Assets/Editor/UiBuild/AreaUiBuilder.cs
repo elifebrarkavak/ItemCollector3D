@@ -45,7 +45,7 @@ namespace ItemCollector3D.EditorTools
         {
             new CardSpec { Id = "green_mine", SceneName = SceneNavigator.GreenMineScene, Display = "GREEN MINE", Sprite = "area_green_mine" },
             new CardSpec { Id = "rocky_canyon", SceneName = SceneNavigator.RockyCanyonScene, Display = "ROCKY CANYON", Sprite = "area_rocky_canyon" },
-            new CardSpec { Id = "ancient_mine", SceneName = "", Display = "ANCIENT MINE", Sprite = "area_ancient_mine" },
+            new CardSpec { Id = "ancient_mine", SceneName = SceneNavigator.AncientMineScene, Display = "ANCIENT MINE", Sprite = "area_ancient_mine" },
         };
 
         /// <summary>Rebuilds only the Area Selection panel inside the Main Menu prefab (everything else in the prefab stays as it is).</summary>

@@ -34,6 +34,9 @@ MonoBehaviour:
   - m_enabled: 1
     m_path: Assets/Scenes/RockyCanyon.unity
     m_guid: 213c9f564aa6c46c29e2dc2a8792d926
+  - m_enabled: 1
+    m_path: Assets/Scenes/AncientMine.unity
+    m_guid: a2b7c539348a14b2380978097662cce5
   m_HasScriptingDefines: 0
   m_ScriptingDefines: []
   m_PlayerSettingsYaml:

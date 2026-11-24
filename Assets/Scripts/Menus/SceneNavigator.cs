@@ -11,6 +11,7 @@ namespace ItemCollector3D.Menus
         public const string GameplayScene = "GameplayTest"; // the original test scene, kept as a sandbox
         public const string GreenMineScene = "GreenMine";   // the first real area (Area Selection -> GREEN MINE)
         public const string RockyCanyonScene = "RockyCanyon"; // the second area (Area Selection -> ROCKY CANYON, opens at 500 total gold)
+        public const string AncientMineScene = "AncientMine"; // the third area (Area Selection -> ANCIENT MINE, opens at 1200 total gold)
 
         /// <summary>Test hook: when set it receives the scene name instead of a real scene load.</summary>
         public static Action<string> LoadHook;
