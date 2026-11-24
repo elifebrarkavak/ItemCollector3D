@@ -78,6 +78,9 @@ namespace ItemCollector3D.Treasure
         public const float DiggingBeepFactor = 0.35f;
 
         public const string GetCloserHint = "GET CLOSER TO DIG";
+
+        /// <summary>Shown instead of the hint above while this scene's area is still locked (the DIG button never appears then).</summary>
+        public const string LockedHint = "AREA LOCKED";
         public const string DigCancelledHint = "TOO FAR - STAY CLOSE TO DIG";
 
         /// <summary>RAPID means "close", not "dig now": DIG is offered only inside the dig radius (<see cref="TreasureDetector.Proximity"/> reaches 1 there).</summary>
@@ -212,6 +215,11 @@ namespace ItemCollector3D.Treasure
             if (Time.unscaledTime < cancelHintUntil)
             {
                 text = DigCancelledHint;
+            }
+            else if (detector != null && Level == SignalLevel.Rapid && hunt != null && !hunt.IsAreaAccessible)
+            {
+                text = LockedHint;
+                color = fastColor;
             }
             else if (detector != null && Level == SignalLevel.Rapid && !IsInsideDigRange(detector.Proximity))
             {

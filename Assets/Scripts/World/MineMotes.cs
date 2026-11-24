@@ -112,6 +112,7 @@ namespace ItemCollector3D.World
             rendererComponent.renderMode = ParticleSystemRenderMode.Billboard;
             rendererComponent.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             rendererComponent.receiveShadows = false;
+            rendererComponent.maxParticleSize = 0.012f; // a speck right next to the camera never grows into a big square (fraction of the viewport height)
             if (material != null)
             {
                 rendererComponent.sharedMaterial = material;

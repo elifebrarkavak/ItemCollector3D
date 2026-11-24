@@ -160,6 +160,10 @@ namespace ItemCollector3D.EditorTools.AncientMine
             return s - Mathf.Floor(s);
         }
 
+        private const float GlowLift = 0.04f;
+        private const int RibbonSamples = 6;
+        private const float RibbonMaxExtra = 0.15f;
+
         /// <summary>A flat ribbon lying on the floor along a polyline (the old stone road, inlays). <paramref name="lift"/> is above the floor mesh.</summary>
         private static void Ribbon(Ctx c, IList<Vector2> points, float width, int color, float lift, bool glow = false, float step = 1.5f)
         {
@@ -192,10 +196,39 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 right[i] = centres[i] + side * width * 0.5f * scale;
             }
 
+            // Clearance (stage 16D): the ribbon is straight between its corners but the floor between them follows a 2 m triangle grid, so on kinked ground the floor poked through (zig-zag edges),
+            // and a glowing inlay lying only 3 cm above a stone ribbon was swallowed by it (dashed lines). Every centre point gets the extra height its two quads need so that all sample points
+            // of the quads clear the floor; the same value is used for the left and the right corner and for both quads that meet there, so there is no step at a joint. Glow ribbons ride a
+            // little higher (GlowLift) so they stay above the stone ribbon they are drawn on. (Meshes built before this change are patched by AmRibbonFix.)
+            if (glow)
+            {
+                lift += GlowLift;
+            }
+
+            var extra = new float[n2];
             for (int i = 0; i < n2 - 1; i++)
             {
-                Vector3 p0 = c.On(left[i].x, left[i].y, lift), p1 = c.On(right[i].x, right[i].y, lift);
-                Vector3 p2 = c.On(right[i + 1].x, right[i + 1].y, lift), p3 = c.On(left[i + 1].x, left[i + 1].y, lift);
+                for (int a = 0; a <= RibbonSamples; a++)
+                {
+                    for (int b = 0; b <= RibbonSamples; b++)
+                    {
+                        float s = a / (float)RibbonSamples, t = b / (float)RibbonSamples;
+                        Vector2 near = Vector2.Lerp(left[i], right[i], s), far = Vector2.Lerp(left[i + 1], right[i + 1], s);
+                        Vector2 at = Vector2.Lerp(near, far, t);
+                        float h0 = Mathf.Lerp(AmLayout.Surface(left[i].x, left[i].y), AmLayout.Surface(right[i].x, right[i].y), s);
+                        float h1 = Mathf.Lerp(AmLayout.Surface(left[i + 1].x, left[i + 1].y), AmLayout.Surface(right[i + 1].x, right[i + 1].y), s);
+                        float deficit = AmLayout.Surface(at.x, at.y) - Mathf.Lerp(h0, h1, t);
+                        extra[i] = Mathf.Max(extra[i], deficit);
+                        extra[i + 1] = Mathf.Max(extra[i + 1], deficit);
+                    }
+                }
+            }
+
+            for (int i = 0; i < n2 - 1; i++)
+            {
+                float e0 = Mathf.Clamp(extra[i], 0f, RibbonMaxExtra), e1 = Mathf.Clamp(extra[i + 1], 0f, RibbonMaxExtra);
+                Vector3 p0 = c.On(left[i].x, left[i].y, lift + e0), p1 = c.On(right[i].x, right[i].y, lift + e0);
+                Vector3 p2 = c.On(right[i + 1].x, right[i + 1].y, lift + e1), p3 = c.On(left[i + 1].x, left[i + 1].y, lift + e1);
                 m.FaceWorld(color, Vector3.up, p0, p1, p2, p3);
             }
 
