@@ -261,7 +261,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 }
                 else if (card.AreaId == "ancient_mine")
                 {
-                    Assert.That(card.SceneName, Is.Empty, "Ancient Mine is still COMING SOON");
+                    Assert.That(card.SceneName, Is.EqualTo("AncientMine"), "Ancient Mine has its scene now (stage 16A): no COMING SOON");
                 }
             }
 

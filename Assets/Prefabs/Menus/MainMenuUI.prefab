@@ -8117,7 +8117,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: ItemCollector3D.Runtime::ItemCollector3D.Menus.AreaCardView
   areaId: ancient_mine
-  sceneName: 
+  sceneName: AncientMine
   nameLabel: {fileID: 3608085626489264903}
   goldLabel: {fileID: 883884607029293228}
   captionLabel: {fileID: 3818133448910422222}

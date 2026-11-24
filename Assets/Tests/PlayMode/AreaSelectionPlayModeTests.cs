@@ -212,15 +212,15 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(areas.Get("rocky_canyon").unlockTotalGold, Is.EqualTo(500), "Rocky Canyon opens at 500 total gold");
             Assert.That(areas.Get("ancient_mine").unlockTotalGold, Is.EqualTo(1200), "Ancient Mine opens at 1200 total gold");
 
-            // (total gold, green mine, rocky canyon, ancient mine); only Green Mine has a scene: the other two can at most be COMING SOON
+            // (total gold, green mine, rocky canyon, ancient mine); Green Mine and Ancient Mine are evaluated with their real scenes, Rocky Canyon without one (the table predates its scene): an open area WITH a scene is Playable
             var table = new (int gold, AreaAvailability green, AreaAvailability rocky, AreaAvailability ancient)[]
             {
                 (0, AreaAvailability.Playable, AreaAvailability.Locked, AreaAvailability.Locked),
                 (499, AreaAvailability.Playable, AreaAvailability.Locked, AreaAvailability.Locked),
                 (500, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.Locked),
                 (1199, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.Locked),
-                (1200, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.ComingSoon),
-                (2500, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.ComingSoon),
+                (1200, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.Playable),
+                (2500, AreaAvailability.Playable, AreaAvailability.ComingSoon, AreaAvailability.Playable),
             };
             foreach (var row in table)
             {
@@ -233,12 +233,12 @@ namespace ItemCollector3D.Tests.PlayMode
 
                 Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene).Availability, Is.EqualTo(row.green), $"green_mine at {row.gold}");
                 Assert.That(AreaSelectController.Evaluate(service, "rocky_canyon", "").Availability, Is.EqualTo(row.rocky), $"rocky_canyon at {row.gold}");
-                Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").Availability, Is.EqualTo(row.ancient), $"ancient_mine at {row.gold}");
+                Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", SceneNavigator.AncientMineScene).Availability, Is.EqualTo(row.ancient), $"ancient_mine at {row.gold}");
 
                 // the state also survives a restart: the same save loaded by a new service gives the same answer
                 ProgressService reloaded = ProgressService.Create(areas, memory);
                 Assert.That(AreaSelectController.Evaluate(reloaded, "rocky_canyon", "").Availability, Is.EqualTo(row.rocky), $"rocky_canyon after reload at {row.gold}");
-                Assert.That(AreaSelectController.Evaluate(reloaded, "ancient_mine", "").Availability, Is.EqualTo(row.ancient), $"ancient_mine after reload at {row.gold}");
+                Assert.That(AreaSelectController.Evaluate(reloaded, "ancient_mine", SceneNavigator.AncientMineScene).Availability, Is.EqualTo(row.ancient), $"ancient_mine after reload at {row.gold}");
             }
         }
 
@@ -506,7 +506,7 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Gold1199_KeepsAncientMineLocked_Gold1200_OpensItAsComingSoon()
+        public IEnumerator Gold1199_KeepsAncientMineLocked_Gold1200_OpensItAsPlayable_AndPlayEntersAncientMine()
         {
             yield return OpenAreaSelection(1199);
             AreaSelectController screen = Find<AreaSelectController>("AreaPanel");
@@ -514,14 +514,24 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(Card(screen, "rocky_canyon").State.Availability, Is.EqualTo(AreaAvailability.Playable));
             Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.Locked), "1199 gold is not enough");
             Assert.That(ancient.GoldLabel.text, Is.EqualTo("1 GOLD TO UNLOCK"), "one gold short");
+            Assert.That(screen.TryEnter("ancient_mine"), Is.EqualTo(AreaEnterResult.Locked));
 
             Find<Button>("AreaBackButton").onClick.Invoke();
             UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("one_more", 1);
             Find<Button>("PlayButton").onClick.Invoke();
             yield return null;
-            Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.ComingSoon), "1200 gold opens Ancient Mine");
+            Assert.That(ancient.SceneName, Is.EqualTo(SceneNavigator.AncientMineScene), "the card opens AncientMine.unity");
+            Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.Playable), "1200 gold opens Ancient Mine, which has its scene now");
+            Assert.That(ancient.ComingSoonVisible, Is.False, "COMING SOON is gone");
+            Assert.That(ancient.LockVisible, Is.False);
+            Assert.That(ancient.PlayButton.gameObject.activeSelf, Is.True, "it shows PLAY");
             Assert.That(ancient.GoldLabel.text, Is.EqualTo("GOAL: 2500 GOLD"));
             Assert.That(ancient.CaptionLabel.text, Is.EqualTo("1200 / 2500 COLLECTED"));
+
+            string requested = null;
+            SceneNavigator.LoadHook = name => requested = name;
+            ancient.PlayButton.onClick.Invoke();
+            Assert.That(requested, Is.EqualTo(SceneNavigator.AncientMineScene), "PLAY opens AncientMine.unity");
         }
 
         [UnityTest]
@@ -551,7 +561,8 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(requested, Is.Null, "a locked or unknown area loads nothing");
             Assert.That(ancient.IsDenyAnimationPlaying, Is.True, "a refused tap gives visible feedback");
 
-            // 1200 gold: Ancient Mine is open but has no map yet -> full colour, UNLOCKED chip, COMING SOON banner and button, no padlock
+            // 1200 gold: an open area WITHOUT a map is COMING SOON. Every real area has a scene now, so Ancient Mine's card instance (a throw-away copy in this test scene) is told it has none
+            ancient.Configure("ancient_mine", "");
             Find<Button>("AreaBackButton").onClick.Invoke();
             UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("more", 700);
             Find<Button>("PlayButton").onClick.Invoke();
