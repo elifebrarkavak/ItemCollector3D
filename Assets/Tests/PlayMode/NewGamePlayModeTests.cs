@@ -384,7 +384,19 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(service.IsAreaUnlocked("rocky_canyon"), Is.False);
             Assert.That(service.IsAreaUnlocked("ancient_mine"), Is.False);
 
-            panel.ConfirmNewGameButton.onClick.Invoke(); // OK
+            // stage 17A: the introduction opens right after the reset; skipping it opens the Character Selection (the "NEW GAME STARTED" note is closed with the Settings panel)
+            var intro = Find<IntroSlidesController>("IntroPanel");
+            Assert.That(intro.IsOpen, Is.True, "the introduction follows START NEW GAME");
+            intro.Skip();
+            yield return null;
+            Assert.That(intro.IsOpen, Is.False);
+            Assert.That(panel.IsOpen, Is.False);
+            var characters = Find<CharacterSelectController>("CharacterPanel");
+            Assert.That(characters.IsOpen, Is.True, "SKIP leads to the existing Character Selection");
+            characters.Cancel();
+            yield return null;
+
+            panel.ConfirmNewGameButton.onClick.Invoke(); // OK (nothing is open any more: nothing happens)
             yield return null;
             Assert.That(panel.IsNewGameDialogOpen, Is.False);
             Assert.That(store.WriteCount, Is.EqualTo(writes + 1), "OK writes nothing");
@@ -572,8 +584,18 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return Press(Centre(panel.ConfirmNewGameButton));
             Assert.That(panel.DialogState, Is.EqualTo(SettingsPanelController.NewGameState.Done));
             AssertFresh(Saved(), "after the real taps");
-            yield return Press(Centre(panel.ConfirmNewGameButton)); // OK
+
+            // stage 17A: the introduction is on top now; real taps on NEXT, NEXT and LET'S PLAY lead back to the Main Menu
+            var intro = Find<IntroSlidesController>("IntroPanel");
+            Assert.That(intro.IsOpen, Is.True);
+            yield return Press(Centre(intro.NextButton));
+            yield return Press(Centre(intro.NextButton));
+            Assert.That(intro.PageIndex, Is.EqualTo(2));
+            yield return Press(Centre(intro.PlayButton));
+            Assert.That(intro.IsOpen, Is.False);
             Assert.That(panel.IsNewGameDialogOpen, Is.False);
+            Assert.That(panel.IsOpen, Is.False);
+            Assert.That(Find<CharacterSelectController>("CharacterPanel").IsOpen, Is.True, "LET'S PLAY leads to the existing Character Selection");
         }
     }
 }

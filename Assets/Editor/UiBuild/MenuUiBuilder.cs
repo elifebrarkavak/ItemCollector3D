@@ -333,6 +333,7 @@ namespace ItemCollector3D.EditorTools
 
                 // Area Selection (PLAY opens it): built by AreaUiBuilder, so a full rebuild keeps it
                 AreaSelectController areaController = AreaUiBuilder.BuildPanel(root.transform);
+                IntroSlidesController introController = IntroUiBuilder.BuildPanel(root.transform); // the NEW GAME introduction (stage 17A), on top of everything
 
                 var controller = root.GetComponent<MainMenuController>();
                 SetRef(controller, "playButton", play);
@@ -344,6 +345,7 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "settingsPanel", settingsInstance.GetComponent<SettingsPanelController>());
                 SetRef(controller, "characterPanel", selectController);
                 SetRef(controller, "areaPanel", areaController);
+                SetRef(controller, "introPanel", introController);
                 PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
             }
             finally
