@@ -341,7 +341,7 @@ namespace ItemCollector3D.Tests.PlayMode
         // ================================================================ structure and budget
 
         [UnityTest]
-        public IEnumerator TheScene_Loads_WithTheDocumentedHierarchy_ReusesTheSystems_AndHasNoTreasuresYet()
+        public IEnumerator TheScene_Loads_WithTheDocumentedHierarchy_ReusesTheSystems_AndHasItsTwentyFiveTreasures()
         {
             var seed = new MemoryProgressStore();
             ProgressService.Create(AssetDatabase.LoadAssetAtPath<AreaCatalog>("Assets/Data/Areas/AreaCatalog.asset"), seed).RegisterCollected("seed", 1200);
@@ -383,12 +383,12 @@ namespace ItemCollector3D.Tests.PlayMode
 
                 Transform group = RootObject("TreasureSpots").transform.Find(zone);
                 Assert.That(group, Is.Not.Null, "TreasureSpots/" + zone);
-                Assert.That(group.childCount, Is.EqualTo(0), "no treasure yet in " + zone + " (stage 16C)");
+                Assert.That(group.GetComponentsInChildren<TreasureSpot>(true).Length, Is.GreaterThanOrEqualTo(3), "the treasures of " + zone + " (stage 16C)");
             }
 
             Assert.That(RootObject("TreasureSpots").transform.Find("_TestPoints"), Is.Null, "no test points left in the scene");
-            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(0));
-            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(0), "no treasure spot is in play");
+            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(25));
+            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(25), "the 25 treasures are in play");
             Assert.That(Env.Find("Boundaries"), Is.Not.Null);
             Assert.That(Env.Find("Lighting/Sun"), Is.Not.Null);
             Assert.That(Env.Find("Markers/PlayerSpawn"), Is.Not.Null);
@@ -1157,7 +1157,7 @@ namespace ItemCollector3D.Tests.PlayMode
         // ================================================================ detector, DIG, COLLECT on a TEMPORARY, isolated treasure spot
 
         [UnityTest]
-        public IEnumerator DetectorDigAndCollect_WorkOnATemporaryIsolatedSpot_AndPayOnce_WithoutTouchingOtherIds()
+        public IEnumerator DetectorDigAndCollect_WorkOnARealTreasure_AndPayOnce_WithoutTouchingOtherIds()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<AreaCatalog>("Assets/Data/Areas/AreaCatalog.asset");
             var seed = new MemoryProgressStore();
@@ -1171,25 +1171,26 @@ namespace ItemCollector3D.Tests.PlayMode
                 var hunt = One<TreasureHuntController>();
                 var detector = One<TreasureDetector>();
                 Transform player = RootObject("Player").transform;
-                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(0), "the scene itself has no treasure");
+                Assert.That(TreasureSpot.Active.Count, Is.EqualTo(25), "the scene has its 25 treasures");
+                TreasureSpot spot = null;
+                foreach (TreasureSpot candidate in TreasureSpot.Active)
+                {
+                    if (candidate.SpotId == "ancient_mine.gate_02")
+                    {
+                        spot = candidate;
+                    }
+                }
 
-                // a temporary spot made from the existing Gold Coin prefab: it lives in this test's scene copy only and is gone when the scene is unloaded
-                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Treasure/Treasure_GoldCoin.prefab");
-                GameObject temp = Object.Instantiate(prefab, new Vector3(-47f, FloorY(-47f, -6f), -6f), Quaternion.identity);
-                SceneManager.MoveGameObjectToScene(temp, scene);
-                temp.name = "TEMP_Treasure_16A";
-                var spot = temp.GetComponent<TreasureSpot>();
-                typeof(TreasureSpot).GetField("spotId", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(spot, "ancient_mine.test_16a");
-                yield return null;
-                Assert.That(spot.SpotId, Is.EqualTo("ancient_mine.test_16a"));
+                Assert.That(spot, Is.Not.Null);
                 Assert.That(spot.Definition.GoldValue, Is.EqualTo(10));
+                float spotZ = spot.transform.position.z;
 
-                Teleport(player, new Vector3(spot.transform.position.x + 6f, FloorY(spot.transform.position.x + 6f, -6f) + 1.05f, -6f));
+                Teleport(player, new Vector3(spot.transform.position.x + 6f, FloorY(spot.transform.position.x + 6f, spotZ) + 1.05f, spotZ));
                 yield return new WaitForSecondsRealtime(0.8f);
                 Assert.That(detector.HasSignal, Is.True, id + ": the detector senses the treasure");
                 Assert.That(detector.NearestHidden, Is.EqualTo(spot));
 
-                Teleport(player, new Vector3(spot.transform.position.x + 1.4f, FloorY(spot.transform.position.x + 1.4f, -6f) + 1.05f, -6f));
+                Teleport(player, new Vector3(spot.transform.position.x + 1.4f, FloorY(spot.transform.position.x + 1.4f, spotZ) + 1.05f, spotZ));
                 Button dig = FindButton("DigButton"), collect = FindButton("CollectButton");
                 yield return WaitUntil(() => dig.gameObject.activeInHierarchy && dig.interactable, 2f);
                 Assert.That(dig.gameObject.activeInHierarchy, Is.True, id + ": DIG is offered in range");
@@ -1209,11 +1210,11 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(hunt.TotalGold, Is.EqualTo(gold + 10), id + ": once");
 
                 GameProgressData saved = JsonUtility.FromJson<GameProgressData>(store.Json);
-                Assert.That(saved.collectedTreasureIds, Contains.Item("ancient_mine.test_16a"));
+                Assert.That(saved.collectedTreasureIds, Contains.Item("ancient_mine.gate_02"));
                 Assert.That(saved.collectedTreasureIds, Contains.Item("green_mine.meadow_01"), "Green Mine's collection is untouched");
                 Assert.That(saved.collectedTreasureIds, Contains.Item("rocky_canyon.outpost_01"), "Rocky Canyon's collection is untouched");
                 Assert.That(saved.collectedTreasureIds.Count, Is.EqualTo(3));
-                Assert.That(seed.Json, Does.Not.Contain("test_16a"), "the seed save of this test never saw the temporary spot (it lives in memory only)");
+                Assert.That(seed.Json, Does.Not.Contain("gate_02"), "the seed save of this test never saw the treasure (the play session wrote its own memory store)");
 
                 yield return SceneManager.UnloadSceneAsync(scene);
                 scene = default;

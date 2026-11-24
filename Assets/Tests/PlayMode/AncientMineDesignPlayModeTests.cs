@@ -225,7 +225,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(heights.Count, Is.GreaterThanOrEqualTo(30), zone + ": crystals have many different heights");
             }
 
-            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(0), "no treasure was added in this stage");
+            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(25), "the 25 treasures of stage 16C");
         }
 
         // ================================================================ the lighting character of each area
@@ -339,8 +339,8 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(perZone.ContainsKey(zone) && perZone[zone] >= 3, Is.True, "at least three clear places in area " + zone);
             }
 
-            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(0));
-            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(0));
+            Assert.That(RootObject("TreasureSpots").GetComponentsInChildren<TreasureSpot>(true).Length, Is.EqualTo(25), "the markers themselves are not treasures: the 25 real ones are under TreasureSpots");
+            Assert.That(TreasureSpot.Active.Count, Is.EqualTo(25));
         }
     }
 }
