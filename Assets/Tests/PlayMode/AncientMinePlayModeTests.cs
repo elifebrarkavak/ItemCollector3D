@@ -830,6 +830,33 @@ namespace ItemCollector3D.Tests.PlayMode
         }
 
         [UnityTest]
+        [RealisticFrameRate]
+        public IEnumerator Ruby_ReachesTheRoyalVault_AndWalksAllTheWayBackToTheAncientGate()
+        {
+            CharacterSelection.Select(CharacterSelection.FemaleId);
+            yield return Load(ScenePath);
+            Time.timeScale = 2f;
+            Transform player = RootObject("Player").transform;
+            var controller = player.GetComponent<ThirdPersonPlayerController>();
+            Camera camera = Camera.main;
+            var stats = new WalkStats();
+            yield return new WaitForSecondsRealtime(1.2f);
+
+            // from the vault's dais (the end of the main route) back along the main route, in reverse, to the gate where the miner started
+            Vector3[] main = RoutePoints("Main");
+            Teleport(player, new Vector3(main[main.Length - 1].x, FloorY(main[main.Length - 1].x, main[main.Length - 1].z) + 1.05f, main[main.Length - 1].z));
+            yield return new WaitForSecondsRealtime(0.5f);
+            var back = new List<Vector3>(main);
+            back.Reverse();
+            yield return WalkRoute(player, controller, camera, back.ToArray(), "back", stats);
+            Vector3 gate = Anchor("A_AncientGate").position;
+            Assert.That(Vector2.Distance(new Vector2(player.position.x, player.position.z), new Vector2(main[0].x, main[0].z)), Is.LessThan(3.5f), "Ruby is back where she started, in the Ancient Gate");
+            Assert.That(Vector2.Distance(new Vector2(main[0].x, main[0].z), new Vector2(gate.x, gate.z)), Is.LessThan(9f));
+            Assert.That(player.position.y, Is.GreaterThan(14f), "and on the gate's level again (about 15.5 m above the vault)");
+            AssertWalkStats("Ruby way back", stats);
+        }
+
+        [UnityTest]
         public IEnumerator TheRoutes_AreGentle_RampsAndPlatformsStayWithinTheControllersLimits_AndAreWideEnough()
         {
             yield return Load(ScenePath);
@@ -910,7 +937,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(narrowestMain, Is.GreaterThan(2.9f), $"the main and the alternate route have about 6 m or more of room everywhere (passages and ramps 7 - 9 m wide, 6.1 m between two hall pillars): {mainWhere}");
             Assert.That(daisNarrowest, Is.GreaterThan(1.5f), "the walk across the vault's dais keeps clear of the altar");
             Assert.That(narrowest, Is.GreaterThan(2.0f), $"every side route has at least about 4 m of room (partly collapsed tunnels, side caves): {narrowGroup} {narrowWhat}");
-            Assert.That(alcoveNarrowest, Is.GreaterThan(0.9f), "the walk to the vault alcove keeps clear of the wall and the pillars (1.5 m of room at the tightest point)");
+            Assert.That(alcoveNarrowest, Is.GreaterThan(0.9f), "the walk to the vault alcove keeps clear of the wall and the pillars (the strip between the pillars and the wall is 3.3 m wide)");
         }
 
         // ================================================================ camera: never in a wall, a pillar or the ceiling
@@ -938,7 +965,7 @@ namespace ItemCollector3D.Tests.PlayMode
                 ("collapsed spur end", new Vector2(-34f, 20.5f)), ("east tunnel", new Vector2(24f, 38f)),
                 ("atrium", new Vector2(48f, -4f)), ("atrium rim", new Vector2(57f, -8f)), ("north branch", new Vector2(54f, 13f)), ("north lobe", new Vector2(46f, 33f)), ("grotto", new Vector2(36f, 14f)),
                 ("south branch", new Vector2(51f, -22f)), ("south lobe", new Vector2(47f, -37f)),
-                ("vault road", new Vector2(33f, -37f)), ("vault door", new Vector2(28f, -37f)), ("vault between pillars", new Vector2(10f, -31.5f)), ("vault dais", new Vector2(10f, -38f)), ("vault alcove", new Vector2(10f, -47.5f)),
+                ("vault road", new Vector2(33f, -37f)), ("vault door", new Vector2(28f, -37f)), ("vault between pillars", new Vector2(10f, -32.2f)), ("vault dais", new Vector2(10f, -38f)), ("vault alcove", new Vector2(10f, -47.1f)),
             };
             int samples = 0, inWall = 0, outside = 0, blocked = 0, tooClose = 0, aimed = 0, belowCeilingMargin = 0;
             var skipped = new List<string>();
@@ -1062,9 +1089,9 @@ namespace ItemCollector3D.Tests.PlayMode
                 ("the great portal's pier", new Vector3(-55f, 0f, -8.8f), Vector2.left, p => p.x > -61.2f),
                 ("a broken column (round: the player may slide round it, never into it)", new Vector3(-55.5f, 0f, 1.6f), Vector2.up, p => Vector2.Distance(new Vector2(p.x, p.z), new Vector2(-55.5f, 6.5f)) > 1.6f),
                 ("the south wall of the gate", new Vector3(-48f, 0f, -6f), Vector2.down, p => p.z > -14.2f),
-                ("the vault entrance's pier and wall", new Vector3(22f, 0f, -29.6f), Vector2.right, p => p.x < 28.6f),
+                ("the vault's east wall beside the gate", new Vector3(24.5f, 0f, -41.5f), Vector2.right, p => p.x < 28.6f),
                 ("a vault pillar (24, -31.5)", new Vector3(24f, 0f, -37f), Vector2.up, p => p.z < -32.2f),
-                ("the vault's south alcove", new Vector3(10f, 0f, -45.5f), Vector2.down, p => p.z > -52.5f),
+                ("the vault's south alcove", new Vector3(10f, 0f, -46.2f), Vector2.down, p => p.z > -52.5f),
                 ("a crystal formation in the vault", new Vector3(-3f, 0f, -38f), Vector2.left, p => p.x > -8.5f),
                 ("the atrium's east wall", new Vector3(50f, 0f, -4f), Vector2.right, p => p.x < 62.2f),
                 ("the workshop's north wall", new Vector3(-6f, 0f, 41f), Vector2.up, p => p.z < 50.2f),

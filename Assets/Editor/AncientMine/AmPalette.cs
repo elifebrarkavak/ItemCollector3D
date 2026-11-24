@@ -23,11 +23,21 @@ namespace ItemCollector3D.EditorTools.AncientMine
             CrystalMagenta = Named + 32, CrystalMagentaLight = Named + 33, PortalGlow = Named + 34, PortalGlowBright = Named + 35, LampWarm = Named + 36,
             StoneTeal = Named + 37, StoneViolet = Named + 38, Sand = Named + 39;
 
-        public const int Count = Named + 40;
+        // stage 16B additions: gold in three tones, statue stone, warm workshop stone, crystal dark tones, water and lamp colours, cloth
+        public const int GoldBright = Named + 40, GoldPale = Named + 41, GoldShade = Named + 42, BronzeDark = Named + 43,
+            StatueLight = Named + 44, StatueMid = Named + 45, StatueDark = Named + 46, StatueTeal = Named + 47, Basalt = Named + 48, MarbleWarm = Named + 49,
+            WoodLight = Named + 50, WoodAged = Named + 51, TealStoneLight = Named + 52, VioletStoneLight = Named + 53, Indigo = Named + 54,
+            CrystalCyanDark = Named + 55, CrystalBlueDark = Named + 56, CrystalVioletDark = Named + 57, CrystalTurquoiseDark = Named + 58, CrystalMagentaDark = Named + 59,
+            CrystalWhite = Named + 60, WaterTurquoise = Named + 61, WaterDeep = Named + 62, LampWarmDim = Named + 63, Ember = Named + 64, GemGold = Named + 65,
+            RubbleWarm = Named + 66, RubbleWarmDark = Named + 67, ClothGold = Named + 68, ClothIndigo = Named + 69, ClothPurple = Named + 70,
+            WarmStoneDark = Named + 71, WarmStoneMid = Named + 72, WarmStoneLight = Named + 73, Soot = Named + 74;
+
+        public const int Count = Named + 75;
         public const int Columns = 16;
         public const int Cell = 8;
 
-        public static int Rows => (Count + Columns - 1) / Columns;
+        /// <summary>Fixed at 8 rows (128 swatches), so a face's UV never changes when swatches are added.</summary>
+        public static int Rows => 8;
 
         public static int Rock(AmZone zone, int tone) => RockBase + (zone == AmZone.None ? 1 : (int)zone - 1) * 8 + Mathf.Clamp(tone, 0, 7);
 
@@ -39,11 +49,11 @@ namespace ItemCollector3D.EditorTools.AncientMine
         private static readonly Color[,] RockRamp =
         {
             // dark, light
-            { new Color(0.13f, 0.17f, 0.30f), new Color(0.62f, 0.72f, 0.84f) },   // Gate: slate blue
-            { new Color(0.17f, 0.15f, 0.28f), new Color(0.72f, 0.68f, 0.82f) },   // Hall: grey violet
-            { new Color(0.15f, 0.09f, 0.26f), new Color(0.62f, 0.46f, 0.72f) },   // Crystal: purple rock
-            { new Color(0.20f, 0.16f, 0.20f), new Color(0.78f, 0.66f, 0.58f) },   // Workshop: dusty warm stone
-            { new Color(0.09f, 0.12f, 0.28f), new Color(0.52f, 0.62f, 0.86f) },   // Vault: deep indigo
+            { new Color(0.15f, 0.19f, 0.32f), new Color(0.70f, 0.80f, 0.92f) },   // Gate: bright slate blue
+            { new Color(0.19f, 0.18f, 0.24f), new Color(0.82f, 0.80f, 0.86f) },   // Hall: neutral grand grey stone
+            { new Color(0.15f, 0.09f, 0.28f), new Color(0.64f, 0.48f, 0.76f) },   // Crystal: purple rock
+            { new Color(0.24f, 0.16f, 0.14f), new Color(0.86f, 0.70f, 0.54f) },   // Workshop: warm old stone
+            { new Color(0.18f, 0.10f, 0.34f), new Color(0.80f, 0.60f, 0.96f) },   // Vault: royal purple
         };
 
         public static Color Colour(int swatch)
@@ -96,6 +106,41 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 case StoneTeal: return new Color(0.30f, 0.50f, 0.58f);
                 case StoneViolet: return new Color(0.44f, 0.36f, 0.62f);
                 case Sand: return new Color(0.78f, 0.70f, 0.60f);
+                case GoldBright: return new Color(1.00f, 0.88f, 0.42f);
+                case GoldPale: return new Color(0.98f, 0.92f, 0.68f);
+                case GoldShade: return new Color(0.58f, 0.42f, 0.14f);
+                case BronzeDark: return new Color(0.46f, 0.30f, 0.20f);
+                case StatueLight: return new Color(0.74f, 0.80f, 0.90f);
+                case StatueMid: return new Color(0.54f, 0.60f, 0.74f);
+                case StatueDark: return new Color(0.36f, 0.40f, 0.56f);
+                case StatueTeal: return new Color(0.30f, 0.64f, 0.68f);
+                case Basalt: return new Color(0.22f, 0.22f, 0.32f);
+                case MarbleWarm: return new Color(0.93f, 0.89f, 0.83f);
+                case WoodLight: return new Color(0.68f, 0.50f, 0.34f);
+                case WoodAged: return new Color(0.44f, 0.36f, 0.32f);
+                case TealStoneLight: return new Color(0.48f, 0.74f, 0.76f);
+                case VioletStoneLight: return new Color(0.62f, 0.54f, 0.84f);
+                case Indigo: return new Color(0.22f, 0.22f, 0.54f);
+                case CrystalCyanDark: return new Color(0.10f, 0.52f, 0.74f);
+                case CrystalBlueDark: return new Color(0.16f, 0.28f, 0.76f);
+                case CrystalVioletDark: return new Color(0.42f, 0.20f, 0.74f);
+                case CrystalTurquoiseDark: return new Color(0.08f, 0.60f, 0.54f);
+                case CrystalMagentaDark: return new Color(0.64f, 0.18f, 0.60f);
+                case CrystalWhite: return new Color(0.92f, 0.97f, 1.00f);
+                case WaterTurquoise: return new Color(0.22f, 0.92f, 0.88f);
+                case WaterDeep: return new Color(0.10f, 0.58f, 0.72f);
+                case LampWarmDim: return new Color(0.92f, 0.64f, 0.32f);
+                case Ember: return new Color(1.00f, 0.56f, 0.22f);
+                case GemGold: return new Color(1.00f, 0.84f, 0.34f);
+                case RubbleWarm: return new Color(0.60f, 0.50f, 0.44f);
+                case RubbleWarmDark: return new Color(0.40f, 0.32f, 0.30f);
+                case ClothGold: return new Color(0.84f, 0.66f, 0.26f);
+                case ClothIndigo: return new Color(0.24f, 0.28f, 0.64f);
+                case ClothPurple: return new Color(0.48f, 0.28f, 0.68f);
+                case WarmStoneDark: return new Color(0.42f, 0.32f, 0.30f);
+                case WarmStoneMid: return new Color(0.66f, 0.54f, 0.46f);
+                case WarmStoneLight: return new Color(0.84f, 0.72f, 0.60f);
+                case Soot: return new Color(0.18f, 0.16f, 0.18f);
                 default: return Color.magenta;
             }
         }

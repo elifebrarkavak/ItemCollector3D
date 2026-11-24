@@ -54,11 +54,13 @@ namespace ItemCollector3D.EditorTools.AncientMine
         /// <summary>The same palette, self-lit: crystals, the portal and the lantern glass. The only emissive material; no transparency.</summary>
         public static Material GlowMaterial(Texture2D palette)
         {
-            Material mat = Lit("AM_Glow", Color.white, palette);
+            // the lit part is kept low and the emission carries the colour: crystals and gold keep their saturated colour under the cave's blue ambient light instead of washing out
+            Material mat = Lit("AM_Glow", new Color(0.5f, 0.5f, 0.5f), palette);
             mat.EnableKeyword("_EMISSION");
-            mat.SetColor("_EmissionColor", new Color(0.9f, 0.9f, 0.9f));
+            mat.SetColor("_EmissionColor", new Color(1f, 1f, 1f));
             mat.SetTexture("_EmissionMap", palette);
-            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            // RealtimeEmissive (not None): with None the URP importer re-evaluates the material, finds no emissive GI flag and switches the _EMISSION keyword off again
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             EditorUtility.SetDirty(mat);
             return mat;
         }

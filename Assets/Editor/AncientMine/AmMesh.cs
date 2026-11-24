@@ -23,11 +23,17 @@ namespace ItemCollector3D.EditorTools.AncientMine
         /// <summary>Faces added while this is true use the emissive submesh.</summary>
         public bool Glow;
 
+        /// <summary>When true, gold-coloured faces (P.Gold, P.GoldBright, P.GoldPale) go to the emissive submesh: the Royal Vault's gold shines instead of turning olive under its purple light.</summary>
+        public bool GoldGlows;
+
         public int Triangles => (lit.Count + glow.Count) / 3;
 
         public bool IsEmpty => verts.Count == 0;
 
         public bool HasGlow => glow.Count > 0;
+
+        /// <summary>True when the mesh holds emissive faces only (one submesh: the glow material).</summary>
+        public bool IsGlowOnly => lit.Count == 0 && glow.Count > 0;
 
         public void Push(Vector3 position, float yaw = 0f, float pitch = 0f, float roll = 0f) => Push(position, Quaternion.Euler(pitch, yaw, roll));
 
@@ -35,6 +41,13 @@ namespace ItemCollector3D.EditorTools.AncientMine
         {
             stack.Push(m);
             m = m * Matrix4x4.TRS(position, rotation, Vector3.one);
+        }
+
+        /// <summary>Like <see cref="Push(Vector3, Quaternion)"/> with a uniform scale (statues in two sizes). Winding stays right: a face points away from its solid's inside point.</summary>
+        public void PushScaled(Vector3 position, Quaternion rotation, float scale)
+        {
+            stack.Push(m);
+            m = m * Matrix4x4.TRS(position, rotation, Vector3.one * scale);
         }
 
         public void Pop() => m = stack.Pop();
@@ -71,7 +84,7 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 uvs.Add(uv);
             }
 
-            List<int> list = Glow ? glow : lit;
+            List<int> list = Glow || (GoldGlows && (color == P.Gold || color == P.GoldBright || color == P.GoldPale)) ? glow : lit;
             for (int i = 1; i < k - 1; i++)
             {
                 list.Add(start);
@@ -111,7 +124,7 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 uvs.Add(uv);
             }
 
-            List<int> list = Glow ? glow : lit;
+            List<int> list = Glow || (GoldGlows && (color == P.Gold || color == P.GoldBright || color == P.GoldPale)) ? glow : lit;
             for (int i = 1; i < k - 1; i++)
             {
                 list.Add(start);
@@ -364,11 +377,19 @@ namespace ItemCollector3D.EditorTools.AncientMine
             mesh.SetVertices(verts);
             mesh.SetNormals(norms);
             mesh.SetUVs(0, uvs);
-            mesh.subMeshCount = HasGlow ? 2 : 1;
-            mesh.SetTriangles(lit, 0);
-            if (HasGlow)
+            if (lit.Count == 0 && HasGlow)
             {
-                mesh.SetTriangles(glow, 1);
+                mesh.subMeshCount = 1; // a mesh of emissive faces only (the crystals of an area): one submesh, the glow material only
+                mesh.SetTriangles(glow, 0);
+            }
+            else
+            {
+                mesh.subMeshCount = HasGlow ? 2 : 1;
+                mesh.SetTriangles(lit, 0);
+                if (HasGlow)
+                {
+                    mesh.SetTriangles(glow, 1);
+                }
             }
 
             mesh.RecalculateBounds();

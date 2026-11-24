@@ -196,7 +196,7 @@ namespace ItemCollector3D.EditorTools.AncientMine
         {
             ("00_HallCentre", new Vector2(0f, 0f)), ("01_HallNorth", new Vector2(0f, 12f)), ("02_HallNorthDoor", new Vector2(0f, 20f)), ("03_NorthRamp", new Vector2(0f, 26f)),
             ("04_WorkshopDoor", new Vector2(0f, 33f)), ("05_WorkshopCentre", new Vector2(-12f, 40f)), ("06_WorkshopEast", new Vector2(4f, 40f)), ("07_EastTunnel1", new Vector2(12f, 41f)),
-            ("08_EastTunnel2", new Vector2(24f, 38f)), ("09_EastTunnel3", new Vector2(34f, 35f)), ("10_LobeNorth", new Vector2(45f, 32f)), ("11_NorthBranch1", new Vector2(47f, 25f)), ("11b_NorthBranch1", new Vector2(46f, 28f)),
+            ("08_EastTunnel2", new Vector2(24f, 38f)), ("09_EastTunnel3", new Vector2(34f, 35f)), ("10_LobeNorth", new Vector2(45f, 32f)), ("11_NorthBranch1", new Vector2(46f, 28f)), ("11b_NorthBranch1b", new Vector2(47f, 25f)),
             ("12_NorthBranch2", new Vector2(50f, 21f)), ("13_NorthBranch3", new Vector2(54f, 13f)), ("14_NorthBranch4", new Vector2(50f, 5f)), ("15_Atrium", new Vector2(48f, -4f)),
             ("16_AtriumDoor", new Vector2(40f, -4f)), ("17_EastRamp", new Vector2(32f, -4f)), ("18_HallEastDoor", new Vector2(24f, -4f)), ("19_HallCentre", new Vector2(0f, 0f)),
         };
@@ -210,8 +210,8 @@ namespace ItemCollector3D.EditorTools.AncientMine
             ("CollapsedSpur", new[] { new Vector2(-12f, 40f), new Vector2(-26f, 40f), new Vector2(-27f, 35f), new Vector2(-26.5f, 32f), new Vector2(-30f, 26f), new Vector2(-34f, 20.5f) }),
             ("DaisNW", new[] { new Vector2(0f, 0f), new Vector2(-8.4f, 3f), new Vector2(-8.4f, 13f), new Vector2(-10f, 17f), new Vector2(-16f, 17f), new Vector2(-18.5f, 16f) }),
             ("DaisSE", new[] { new Vector2(0f, 0f), new Vector2(8.4f, -3f), new Vector2(8.4f, -13f), new Vector2(10f, -17f), new Vector2(16f, -17f), new Vector2(18.5f, -16f) }),
-            ("VaultAlcove", new[] { new Vector2(24f, -38f), new Vector2(21f, -42f), new Vector2(19f, -47.5f), new Vector2(10f, -47.5f) }),
-            ("VaultNorthWest", new[] { new Vector2(10f, -38f), new Vector2(3f, -38f), new Vector2(-3f, -38f), new Vector2(-1f, -34f), new Vector2(0f, -31f) }),
+            ("VaultAlcove", new[] { new Vector2(24f, -38f), new Vector2(21f, -41.5f), new Vector2(19.5f, -44f), new Vector2(19.5f, -47.1f), new Vector2(10f, -47.1f) }),
+            ("VaultNorthWest", new[] { new Vector2(10f, -38f), new Vector2(3f, -38f), new Vector2(-3f, -38f), new Vector2(-1f, -35.5f), new Vector2(0f, -33.5f) }),
         };
 
         /// <summary>The end points of the side routes.</summary>
@@ -227,6 +227,23 @@ namespace ItemCollector3D.EditorTools.AncientMine
 
             return list;
         }
+
+        /// <summary>
+        /// Places kept clear for the treasures of stage 16C (NOT treasures: only empty marker transforms under Markers/TreasureCandidates): id, point, lift above the floor (a pedestal top).
+        /// Every one is inside a walkable shape, reachable, and has about 1 m of free space round it (checked by the tests).
+        /// </summary>
+        public static readonly (string id, Vector2 point, float lift)[] TreasureCandidates =
+        {
+            ("A_Gate_01", new Vector2(-49.5f, 0.8f), 0f), ("A_Gate_02", new Vector2(-49f, -7f), 0f), ("A_Gate_03", new Vector2(-56f, 2f), 0f), ("A_Cistern_01", new Vector2(-49f, -35.5f), 0f),
+            ("B_Dais_NW", new Vector2(-20f, 17f), 0f), ("B_Dais_NE", new Vector2(20f, 17f), 0f), ("B_Dais_SW", new Vector2(-20f, -17f), 0f), ("B_Dais_SE", new Vector2(20f, -17f), 0f),
+            ("B_Aisle_South", new Vector2(-14.5f, -11.5f), 0f), ("B_Aisle_North", new Vector2(14.5f, 11.5f), 0f),
+            ("C_Grotto_01", new Vector2(36f, 14f), 0f), ("C_Atrium_01", new Vector2(50.5f, -0.5f), 0f), ("C_LobeSouth_01", new Vector2(44.5f, -33.5f), 0f), ("C_LobeSouth_02", new Vector2(43.5f, -40f), 0f),
+            ("C_LobeNorth_01", new Vector2(43f, 36f), 0f),
+            ("D_Workshop_01", new Vector2(-5.5f, 43.5f), 0f), ("D_Workshop_02", new Vector2(-17f, 38f), 0f), ("D_Workshop_03", new Vector2(-24.5f, 41.8f), 0f), ("D_Cache_01", new Vector2(-51.5f, 45.2f), 0f),
+            ("D_Spur_01", new Vector2(-33.5f, 18.5f), 0f),
+            ("E_Dais_01", new Vector2(10f, -38.2f), 0f), ("E_Dais_02", new Vector2(14.5f, -39.5f), 0f), ("E_Dais_03", new Vector2(5.5f, -40f), 0f),
+            ("E_Pedestal_01", new Vector2(0f, -50f), 1.35f), ("E_Pedestal_02", new Vector2(10f, -50f), 1.35f), ("E_Pedestal_03", new Vector2(20f, -50f), 1.35f),
+        };
 
         // ------------------------------------------------------------------ height field
 

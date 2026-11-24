@@ -63,6 +63,18 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 sb.AppendLine($"anchor {a.name,-22} {a.point} reachable={Reach(reach, a.point)} floor {AmLayout.Surface(a.point.x, a.point.y):F2} zone {AmLayout.ZoneAt(a.point.x, a.point.y)}");
             }
 
+            int unreachable = 0;
+            foreach (var cand in AmLayout.TreasureCandidates)
+            {
+                bool ok = Reach(reach, cand.point) && AmLayout.EdgeDistance(cand.point.x, cand.point.y) <= -2f;
+                unreachable += ok ? 0 : 1;
+                if (!ok)
+                {
+                    sb.AppendLine($"treasure candidate {cand.id} {cand.point}: NOT reachable / not inside a cave");
+                }
+            }
+
+            sb.AppendLine($"treasure candidates: {AmLayout.TreasureCandidates.Length}, not reachable or too close to a wall: {unreachable}");
             foreach (var p in AmLayout.SidePlaces)
             {
                 sb.AppendLine($"place {p.name,-22} {p.point} reachable={Reach(reach, p.point)} floor {AmLayout.Surface(p.point.x, p.point.y):F2}");

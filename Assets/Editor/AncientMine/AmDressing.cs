@@ -6,10 +6,10 @@ using UnityEngine;
 namespace ItemCollector3D.EditorTools.AncientMine
 {
     /// <summary>
-    /// Stage 16A placeholders for the five areas: big architecture (pillars, arches, the great portal, platforms), simple crystal formations, and the colliders that make them solid.
-    /// MODULAR: <see cref="DressZone"/> clears only that area's "Props" and "Colliders" children and refills them (the cave shell, the other areas and the treasure groups stay as they are),
-    /// so stage 16B can rework one area at a time. Props of an area are merged into ONE mesh ("Structures": lit palette + emissive submesh). Colliders are only added where the player
-    /// or the camera can really touch something; ornaments high above the walkway have none.
+    /// The look of the five areas (stage 16B): architecture (pillars, arches, gateways, statues, reliefs, friezes, floor inlays), crystal formations and the colliders that make them solid.
+    /// MODULAR: <see cref="DressZone"/> clears only that area's "Props" and "Colliders" children and refills them (the cave shell, the routes and markers, the other areas and the treasure groups
+    /// stay as they are). Per area ONE merged "Structures" mesh (lit palette + a little emissive trim) and ONE merged "Crystals" mesh (emissive only, its own renderer). Colliders only where the player
+    /// or the camera can really touch something; ornaments high above the walkway, reliefs and floor inlays have none.
     /// </summary>
     public static partial class AmDressing
     {
@@ -36,9 +36,11 @@ namespace ItemCollector3D.EditorTools.AncientMine
         {
             public Transform Zone, Colliders;
             public AmZone Id;
-            public readonly AmMesh Mesh = new();
+            public readonly AmMesh Mesh = new();      // architecture (lit) and small emissive trim
+            public readonly AmMesh Crystals = new();  // crystals only (emissive)
             public int Count;
             public int Seed;
+            public int Formations;
 
             public float Floor(float x, float z) => AmLayout.Surface(x, z);
 
@@ -104,7 +106,7 @@ namespace ItemCollector3D.EditorTools.AncientMine
             }
 
             AmLayout.ResetGrid();
-            var ctx = new Ctx { Zone = zone, Id = ZoneOf(zoneName), Colliders = new GameObject(CollidersName).transform, Seed = zoneName.GetHashCode() & 0xFFFF };
+            var ctx = new Ctx { Zone = zone, Id = ZoneOf(zoneName), Colliders = new GameObject(CollidersName).transform, Seed = (zoneName.GetHashCode() & 0xFFFF) + 17 };
             ctx.Colliders.SetParent(zone, false);
             switch (ctx.Id)
             {
@@ -125,123 +127,37 @@ namespace ItemCollector3D.EditorTools.AncientMine
                     break;
             }
 
+            Material lit = AssetDatabase.LoadAssetAtPath<Material>(AmAssets.MaterialFolder + "/AM_Palette.mat");
+            Material glow = AssetDatabase.LoadAssetAtPath<Material>(AmAssets.MaterialFolder + "/AM_Glow.mat");
             Transform props = new GameObject(PropsName).transform;
             props.SetParent(zone, false);
+
             var structures = new GameObject("Structures");
             structures.transform.SetParent(props, false);
-            Mesh mesh = ctx.Mesh.ToMesh($"AM_{ctx.Id}_Structures", AmAssets.DressingFolder);
-            structures.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var renderer = structures.AddComponent<MeshRenderer>();
-            renderer.sharedMaterials = ctx.Mesh.HasGlow
-                ? new[] { AssetDatabase.LoadAssetAtPath<Material>(AmAssets.MaterialFolder + "/AM_Palette.mat"), AssetDatabase.LoadAssetAtPath<Material>(AmAssets.MaterialFolder + "/AM_Glow.mat") }
-                : new[] { AssetDatabase.LoadAssetAtPath<Material>(AmAssets.MaterialFolder + "/AM_Palette.mat") };
+            structures.AddComponent<MeshFilter>().sharedMesh = ctx.Mesh.ToMesh($"AM_{ctx.Id}_Structures", AmAssets.DressingFolder);
+            structures.AddComponent<MeshRenderer>().sharedMaterials = ctx.Mesh.HasGlow ? new[] { lit, glow } : new[] { lit };
             GameObjectUtility.SetStaticEditorFlags(structures, StaticEditorFlags.BatchingStatic);
-            return $"{zoneName}: {ctx.Mesh.Triangles} triangles in Structures, {ctx.Colliders.childCount} colliders";
+
+            int crystalTriangles = 0;
+            if (!ctx.Crystals.IsEmpty)
+            {
+                var crystals = new GameObject("Crystals");
+                crystals.transform.SetParent(props, false);
+                crystals.AddComponent<MeshFilter>().sharedMesh = ctx.Crystals.ToMesh($"AM_{ctx.Id}_Crystals", AmAssets.DressingFolder);
+                crystals.AddComponent<MeshRenderer>().sharedMaterials = ctx.Crystals.IsGlowOnly ? new[] { glow } : new[] { lit, glow };
+                GameObjectUtility.SetStaticEditorFlags(crystals, StaticEditorFlags.BatchingStatic);
+                crystalTriangles = ctx.Crystals.Triangles;
+            }
+
+            return $"{zoneName}: {ctx.Mesh.Triangles} triangles in Structures, {crystalTriangles} in Crystals ({ctx.Formations} formations), {ctx.Colliders.childCount} colliders";
         }
 
-        // ================================================================ shared building blocks
+        // ================================================================ shared basics
 
         private static float Rand(Ctx c, int a, int b = 0)
         {
             float s = Mathf.Sin((a * 12.9898f + b * 78.233f + c.Seed * 0.37f) * 3.1f) * 43758.5453f;
             return s - Mathf.Floor(s);
-        }
-
-        /// <summary>A free-standing column: plinth, shaft (tapered n-gon), two ring bands and a capital. Its collider is a capsule as tall as the camera can reach, not the whole shaft.</summary>
-        private static void Column(Ctx c, float x, float z, float radius, float height, int shaft, int plinth, int bands, bool collider = true, float groundY = float.NaN, int sides = 8)
-        {
-            AmMesh m = c.Mesh;
-            Vector3 b = new(x, float.IsNaN(groundY) ? c.Floor(x, z) : groundY, z);
-            m.Block(b, new Vector3(radius * 2.7f, 0.7f, radius * 2.7f), plinth, bands);
-            m.Poly(b + Vector3.up * 0.7f, radius, radius * 0.9f, height - 1.9f, sides, shaft, shaft, 22.5f);
-            for (int k = 1; k <= 2; k++)
-            {
-                m.Poly(b + Vector3.up * (0.7f + (height - 1.9f) * k / 3f), radius * 1.12f, radius * 1.12f, 0.35f, sides, bands, bands, 22.5f);
-            }
-
-            m.Block(b + Vector3.up * (height - 1.2f), new Vector3(radius * 3.0f, 1.2f, radius * 3.0f), plinth, bands);
-            if (collider)
-            {
-                c.Capsule("Column", b, radius * 1.05f, Mathf.Min(height, 9f));
-            }
-        }
-
-        /// <summary>A broken column: a stump with a ragged top and a fallen drum beside it.</summary>
-        private static void BrokenColumn(Ctx c, float x, float z, float radius, float height, float drumYaw, int body, int top, bool drum = true)
-        {
-            AmMesh m = c.Mesh;
-            Vector3 b = c.On(x, z);
-            m.Block(b, new Vector3(radius * 2.7f, 0.6f, radius * 2.7f), body, top);
-            m.Poly(b + Vector3.up * 0.6f, radius, radius * 0.93f, height - 0.6f, 7, body, top, 10f);
-            // the ragged break: a shard rising from the top
-            m.Poly(b + Vector3.up * (height) + new Vector3(radius * 0.3f, 0f, 0f), radius * 0.55f, radius * 0.1f, 0.9f, 5, body, top, 0f);
-            c.Capsule("BrokenColumn", b, radius * 1.05f, Mathf.Min(height, 5f));
-            if (drum)
-            {
-                Vector3 d = new(x + Mathf.Cos(drumYaw * Mathf.Deg2Rad) * (radius * 3.2f), 0f, z + Mathf.Sin(drumYaw * Mathf.Deg2Rad) * (radius * 3.2f));
-                d.y = c.Floor(d.x, d.z);
-                Vector3 axis = new(Mathf.Cos(drumYaw * Mathf.Deg2Rad), 0f, Mathf.Sin(drumYaw * Mathf.Deg2Rad));
-                Vector3 centre = d + Vector3.up * radius * 0.95f;
-                m.Pipe(centre - axis * radius * 1.3f, centre + axis * radius * 1.3f, radius * 0.95f, 7, body, top);
-                c.Box("Drum", centre, new Vector3(radius * 2.6f, radius * 1.9f, radius * 1.9f), -drumYaw);
-            }
-        }
-
-        private static readonly int[][] Themes =
-        {
-            new[] { P.CrystalCyan, P.CrystalCyanLight },
-            new[] { P.CrystalBlue, P.CrystalBlueLight },
-            new[] { P.CrystalViolet, P.CrystalVioletLight },
-            new[] { P.CrystalTurquoise, P.CrystalTurquoiseLight },
-            new[] { P.CrystalMagenta, P.CrystalMagentaLight },
-        };
-
-        /// <summary>A crystal formation: one tall crystal and satellites round it, all emissive. <paramref name="colliderHeight"/> &gt; 0 gives it a capsule collider.</summary>
-        private static void Cluster(Ctx c, float x, float z, float height, int theme, int count, float spread, float colliderHeight, int seed, float groundY = float.NaN)
-        {
-            AmMesh m = c.Mesh;
-            int[] colours = Themes[theme % Themes.Length];
-            Vector3 b = new(x, float.IsNaN(groundY) ? c.Floor(x, z) : groundY, z);
-            bool previous = m.Glow;
-            m.Glow = true;
-            m.Crystal(b - Vector3.up * 0.2f, height * 0.17f, height + 0.2f, colours[0], colours[1], 3f, Rand(c, seed) * 360f, 6, Rand(c, seed, 1) * 60f);
-            for (int k = 0; k < count; k++)
-            {
-                float angle = (k / (float)count + Rand(c, seed, k + 3) * 0.3f) * 360f;
-                float radius = spread * (0.45f + Rand(c, seed, k + 9) * 0.6f);
-                float h = height * (0.35f + Rand(c, seed, k + 20) * 0.45f);
-                Vector3 p = b + new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad) * radius, -0.2f, Mathf.Sin(angle * Mathf.Deg2Rad) * radius);
-                int pick = (k & 1) == 0 ? 0 : 1;
-                m.Crystal(p, h * 0.2f, h, colours[pick], colours[1 - pick], 10f + Rand(c, seed, k + 40) * 16f, 90f - angle, 6, Rand(c, seed, k + 60) * 60f);
-            }
-
-            m.Glow = previous;
-            if (colliderHeight > 0f)
-            {
-                c.Capsule("Crystal", b, Mathf.Max(0.7f, spread * 0.7f), colliderHeight);
-            }
-        }
-
-        /// <summary>A crystal or a rock spike hanging from the ceiling (visual only).</summary>
-        private static void Hanging(Ctx c, float x, float z, float length, int theme, bool glowing, int rockTone)
-        {
-            AmMesh m = c.Mesh;
-            float top = AmLayout.CeilingAt(x, z) + 0.3f;
-            m.Push(new Vector3(x, top, z), Quaternion.Euler(180f, 0f, 0f));
-            bool previous = m.Glow;
-            m.Glow = glowing;
-            if (glowing)
-            {
-                int[] colours = Themes[theme % Themes.Length];
-                m.Crystal(Vector3.zero, length * 0.2f, length, colours[0], colours[1], 4f, 0f, 6, 30f);
-            }
-            else
-            {
-                m.Poly(Vector3.zero, length * 0.2f, 0f, length, 6, rockTone, rockTone, 20f);
-            }
-
-            m.Glow = previous;
-            m.Pop();
         }
 
         /// <summary>A flat ribbon lying on the floor along a polyline (the old stone road, inlays). <paramref name="lift"/> is above the floor mesh.</summary>
@@ -287,20 +203,76 @@ namespace ItemCollector3D.EditorTools.AncientMine
         }
 
         /// <summary>A flat disc lying on a floor of constant height.</summary>
-        private static void FloorDisc(Ctx c, float x, float z, float radius, int color, float lift, int sides = 24, bool glow = false)
+        private static void FloorDisc(Ctx c, float x, float z, float radius, int color, float lift, int sides = 24, bool glow = false, float groundY = float.NaN)
         {
             AmMesh m = c.Mesh;
             bool previous = m.Glow;
             m.Glow = glow;
+            float y = (float.IsNaN(groundY) ? c.Floor(x, z) : groundY) + lift;
             var pts = new Vector3[sides];
             for (int k = 0; k < sides; k++)
             {
                 float a = -k / (float)sides * Mathf.PI * 2f;
-                pts[k] = new Vector3(x + Mathf.Cos(a) * radius, c.Floor(x, z) + lift, z + Mathf.Sin(a) * radius);
+                pts[k] = new Vector3(x + Mathf.Cos(a) * radius, y, z + Mathf.Sin(a) * radius);
             }
 
             m.FaceWorld(color, Vector3.up, pts);
             m.Glow = previous;
+        }
+
+        /// <summary>A flat ring (annulus) lying on a floor of constant height.</summary>
+        private static void FloorRing(Ctx c, float x, float z, float r0, float r1, int color, float lift, int sides = 28, bool glow = false, float groundY = float.NaN, float arcStart = 0f, float arcDegrees = 360f)
+        {
+            AmMesh m = c.Mesh;
+            bool previous = m.Glow;
+            m.Glow = glow;
+            float y = (float.IsNaN(groundY) ? c.Floor(x, z) : groundY) + lift;
+            for (int k = 0; k < sides; k++)
+            {
+                float a0 = (arcStart + arcDegrees * k / sides) * Mathf.Deg2Rad, a1 = (arcStart + arcDegrees * (k + 1) / sides) * Mathf.Deg2Rad;
+                Vector3 p0 = new(x + Mathf.Cos(a0) * r0, y, z + Mathf.Sin(a0) * r0), p1 = new(x + Mathf.Cos(a0) * r1, y, z + Mathf.Sin(a0) * r1);
+                Vector3 p2 = new(x + Mathf.Cos(a1) * r1, y, z + Mathf.Sin(a1) * r1), p3 = new(x + Mathf.Cos(a1) * r0, y, z + Mathf.Sin(a1) * r0);
+                m.FaceWorld(color, Vector3.up, p0, p1, p2, p3);
+            }
+
+            m.Glow = previous;
+        }
+
+        /// <summary>A flat convex polygon lying on the floor (diamonds, stars, triangles of the floor symbols).</summary>
+        private static void FloorPolygon(Ctx c, int color, float lift, bool glow, float groundY, params Vector2[] points)
+        {
+            AmMesh m = c.Mesh;
+            bool previous = m.Glow;
+            m.Glow = glow;
+            var pts = new Vector3[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                pts[i] = new Vector3(points[i].x, groundY + lift, points[i].y);
+            }
+
+            m.FaceWorld(color, Vector3.up, pts);
+            m.Glow = previous;
+        }
+
+        /// <summary>A sun symbol on the floor: a ring, a disc, rays (gold) and an emissive core when asked (coreGlow >= 0).</summary>
+        private static void FloorSun(Ctx c, float x, float z, float radius, float groundY, int gold, int coreGlow, int rays = 12)
+        {
+            FloorRing(c, x, z, radius * 0.78f, radius * 0.88f, gold, 0.07f, 28, false, groundY);
+            FloorDisc(c, x, z, radius * 0.5f, gold, 0.075f, 20, false, groundY);
+            if (coreGlow >= 0)
+            {
+                FloorDisc(c, x, z, radius * 0.3f, coreGlow, 0.085f, 16, true, groundY);
+            }
+
+            for (int k = 0; k < rays; k++)
+            {
+                float a = k * Mathf.PI * 2f / rays;
+                float a0 = a - 0.11f, a1 = a + 0.11f;
+                FloorPolygon(c, gold, 0.07f, false, groundY,
+                    new Vector2(x + Mathf.Cos(a0) * radius * 0.92f, z + Mathf.Sin(a0) * radius * 0.92f),
+                    new Vector2(x + Mathf.Cos(a) * radius * 1.22f, z + Mathf.Sin(a) * radius * 1.22f),
+                    new Vector2(x + Mathf.Cos(a1) * radius * 0.92f, z + Mathf.Sin(a1) * radius * 0.92f));
+            }
         }
 
         /// <summary>A free-standing arch: a half-round ring on two piers, across a passage that runs along local z of <paramref name="yaw"/>.</summary>
@@ -331,87 +303,96 @@ namespace ItemCollector3D.EditorTools.AncientMine
             }
         }
 
-        // ================================================================ A  ANCIENT GATE
-
-        private static void DressGate(Ctx c)
+        /// <summary>
+        /// A gateway with a carved look: the stone arch of <see cref="Gateway"/> plus a thin gold trim ring on its front and back, a gold keystone, gold bands on the piers and a crystal sign on each
+        /// pier face. Same footprint and colliders as the plain gateway.
+        /// </summary>
+        private static void OrnateGateway(Ctx c, Vector3 baseCentre, float yaw, float innerRadius, float ringThickness, float depth, float springHeight, int stone, int alt, int gold, int goldBright, bool colliders = true)
         {
             AmMesh m = c.Mesh;
-            float f = 15.5f;
-
-            // ---- the great portal in the west wall: a tall half-round arch on two piers, a glowing doorway behind it
-            Vector3 portal = new(-60.4f, f, -2f);
-            Gateway(c, portal, 90f, 5.6f, 2.4f, 3.4f, 9f, P.Rock(AmZone.Gate, 5), P.Rock(AmZone.Gate, 3), true);
-            // the doorway: a glowing panel (an arched polygon) just in front of the wall
-            m.Glow = true;
-            var door = new List<Vector3>();
-            door.Add(new Vector3(-60.2f, f, -2f + 5.6f));
-            for (int k = 0; k <= 10; k++)
+            Gateway(c, baseCentre, yaw, innerRadius, ringThickness, depth, springHeight, stone, alt, colliders);
+            float outer = innerRadius + ringThickness;
+            m.Push(baseCentre, yaw);
+            for (int face = -1; face <= 1; face += 2)
             {
-                float a = Mathf.PI * k / 10f;
-                door.Add(new Vector3(-60.2f, f + 9f + Mathf.Sin(a) * 5.6f, -2f + Mathf.Cos(a) * 5.6f));
+                m.Push(new Vector3(0f, springHeight, face * (depth * 0.5f + 0.03f)), Quaternion.identity);
+                m.ArchRing(Vector3.zero, innerRadius + 0.12f, innerRadius + 0.42f, 0.08f, 10, gold, goldBright);   // gold trim on the inner edge
+                m.ArchRing(Vector3.zero, outer - 0.42f, outer - 0.12f, 0.08f, 10, gold, goldBright);              // and on the outer edge
+                m.Pop();
             }
 
-            door.Add(new Vector3(-60.2f, f, -2f - 5.6f));
-            m.FaceWorld(P.PortalGlow, Vector3.right, door.ToArray());
-            // a brighter core so the panel is not one flat colour
-            var core = new List<Vector3> { new Vector3(-60.15f, f, -2f + 3.0f) };
-            for (int k = 0; k <= 8; k++)
+            m.Block(new Vector3(0f, springHeight + outer - 0.15f, 0f), new Vector3(1.4f, 1.1f, depth * 1.05f), goldBright, gold);   // keystone
+            m.Block(new Vector3(0f, springHeight + innerRadius - 0.1f, 0f), new Vector3(0.9f, 0.9f, depth * 1.08f), gold, goldBright);
+            for (int side = -1; side <= 1; side += 2)
             {
-                float a = Mathf.PI * k / 8f;
-                core.Add(new Vector3(-60.15f, f + 9f + Mathf.Sin(a) * 3.0f, -2f + Mathf.Cos(a) * 3.0f));
+                float px = side * (innerRadius + ringThickness * 0.5f);
+                m.Block(new Vector3(px, springHeight - 0.5f, 0f), new Vector3(ringThickness * 1.12f, 0.35f, depth * 1.12f), gold, goldBright);
+                m.Block(new Vector3(px, 0.7f, 0f), new Vector3(ringThickness * 1.18f, 0.25f, depth * 1.18f), gold, goldBright);
+                for (int face = -1; face <= 1; face += 2)
+                {
+                    CrystalSign(m, new Vector3(px, springHeight * 0.45f, face * (depth * 0.5f + 0.04f)), face > 0 ? 0f : 180f, ringThickness * 0.7f, gold, goldBright);
+                }
             }
 
-            core.Add(new Vector3(-60.15f, f, -2f - 3.0f));
-            m.FaceWorld(P.PortalGlowBright, Vector3.right, core.ToArray());
-            m.Glow = false;
-            // steps in front of the portal
-            m.Block(new Vector3(-59.0f, f, -2f), new Vector3(2.4f, 0.25f, 13.5f), P.RoadStoneDark, P.RoadStone); // 0.25 m: lower than the controller's 0.3 m step, so it is walked over, not a wall
-            c.Box("PortalStep", new Vector3(-59.0f, f + 0.125f, -2f), new Vector3(2.4f, 0.25f, 13.5f));
-
-            // ---- the old stone road: from the portal through the hall and down the ramp to the Hall of Pillars
-            var road = new List<Vector2> { new(-58f, -2f), new(-40f, -2f), new(-32f, -2f), new(-24f, -2f) };
-            Ribbon(c, road, 6.6f, P.RoadStone, 0.05f);
-            Ribbon(c, new List<Vector2> { new(-58f, -5.0f), new(-24f, -5.0f) }, 0.5f, P.RoadStoneDark, 0.07f);
-            Ribbon(c, new List<Vector2> { new(-58f, 1.0f), new(-24f, 1.0f) }, 0.5f, P.RoadStoneDark, 0.07f);
-            Ribbon(c, road, 0.4f, P.RoadInlay, 0.08f, true);
-
-            // ---- the second, smaller arch over the way out (the road leaves the hall under it)
-            Gateway(c, new Vector3(-38.6f, c.Floor(-38.6f, -2f), -2f), 90f, 4.9f, 1.7f, 2.6f, 8f, P.Rock(AmZone.Gate, 5), P.Rock(AmZone.Gate, 3), true);
-
-            // ---- fallen and broken columns beside the road, leaving it free; two tall standing columns flank the way out
-            BrokenColumn(c, -55.5f, 6.5f, 1.25f, 5.5f, 20f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6));
-            BrokenColumn(c, -50.5f, 7.2f, 1.2f, 3.2f, 200f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6));
-            BrokenColumn(c, -45.0f, 6.4f, 1.3f, 7.0f, 60f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6));
-            BrokenColumn(c, -51.0f, -9.8f, 1.2f, 4.0f, 330f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6));
-            BrokenColumn(c, -45.5f, -10.2f, 1.25f, 2.6f, 200f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6));
-            BrokenColumn(c, -58.0f, 8.0f, 1.1f, 2.2f, 300f, P.Rock(AmZone.Gate, 4), P.Rock(AmZone.Gate, 6), false);
-            Column(c, -42.5f, -9.6f, 1.2f, 13f, P.Rock(AmZone.Gate, 5), P.Rock(AmZone.Gate, 3), P.Rock(AmZone.Gate, 6));
-            Column(c, -42.5f, 6.4f, 1.2f, 13f, P.Rock(AmZone.Gate, 5), P.Rock(AmZone.Gate, 3), P.Rock(AmZone.Gate, 6));
-            // the entrance of the hidden passage is half-covered by a leaning slab (it does not block it)
-            m.Push(c.On(-59.2f, -11.9f), 20f);
-            m.Box(new Vector3(0f, 1.6f, 0f), new Vector3(1.0f, 3.2f, 3.4f), P.Rock(AmZone.Gate, 3), P.Rock(AmZone.Gate, 5));
             m.Pop();
-            c.Box("LeaningSlab", c.On(-59.2f, -11.9f, 1.6f), new Vector3(1.0f, 3.2f, 3.4f), -20f);
+        }
 
-            // ---- crystal accents (the "light" of the start): small clusters in the corners and along the walls, cool cyan and blue
-            Cluster(c, -59.2f, 8.4f, 3.4f, 0, 4, 1.1f, 3f, 1);
-            Cluster(c, -59.2f, -12.2f, 2.8f, 1, 3, 0.9f, 2.4f, 2);
-            Cluster(c, -52.0f, 9.0f, 2.4f, 3, 3, 0.8f, 0f, 3);
-            Cluster(c, -40.6f, 9.0f, 3.0f, 0, 4, 1.0f, 2.6f, 4);
-            Cluster(c, -40.6f, -12.6f, 3.0f, 2, 4, 1.0f, 2.6f, 5);
-            Cluster(c, -47.5f, -13.0f, 2.0f, 1, 3, 0.8f, 0f, 6);
-            // the old cistern: crystals around the water basin
-            Cluster(c, -58.0f, -37.0f, 4.5f, 3, 5, 1.3f, 3.5f, 7);
-            Cluster(c, -49.0f, -38.0f, 3.4f, 1, 4, 1.1f, 3f, 8);
-            Cluster(c, -54.0f, -40.5f, 3.0f, 0, 3, 0.9f, 0f, 9);
-            m.Block(c.On(-54f, -33f), new Vector3(5.2f, 0.5f, 5.2f), P.Rock(AmZone.Gate, 3), P.StoneTeal);
-            c.Box("CisternBasin", c.On(-54f, -33f, 0.25f), new Vector3(5.2f, 0.5f, 5.2f));
+        // ================================================================ walls: where a rectangular room's wall really is at a given height
 
-            // ---- the ceiling: hanging rock spikes and a few lights
-            for (int k = 0; k < 14; k++)
+        /// <summary>A point on a wall surface (the hall walls lean outwards over their height), the yaw that makes a panel face into the room and the lean to match the wall.</summary>
+        private struct WallRef
+        {
+            public Vector3 Origin;
+            public float Yaw;
+            public float Lean;
+        }
+
+        /// <summary>
+        /// <paramref name="side"/>: 0 = the +x wall, 1 = the -x wall, 2 = the +z wall, 3 = the -z wall of the rectangular room <paramref name="shapeName"/>;
+        /// <paramref name="along"/> is the coordinate along the wall (z for the x walls, x for the z walls); <paramref name="y"/> the world height.
+        /// </summary>
+        private static WallRef Wall(string shapeName, int side, float along, float y)
+        {
+            AmLayout.Shape s = null;
+            foreach (AmLayout.Shape candidate in AmLayout.Shapes)
             {
-                Hanging(c, -59f + Rand(c, k, 1) * 19f, -12f + Rand(c, k, 2) * 21f, 2.4f + Rand(c, k, 3) * 3.2f, k % 3, k % 4 == 0, P.Rock(AmZone.Gate, 2));
+                if (candidate.IsRect && candidate.Name == shapeName)
+                {
+                    s = candidate;
+                }
             }
+
+            float height = s.CeilAbs - s.Floor;
+            float lean = Mathf.Atan(s.Run / height) * Mathf.Rad2Deg;
+            float d = s.Run * Mathf.Clamp01((y - s.Floor) / height);
+            var w = new WallRef { Lean = lean };
+            switch (side)
+            {
+                case 0:
+                    w.Origin = new Vector3(s.Centre.x + s.Half.x + d, y, along);
+                    w.Yaw = -90f;
+                    break;
+                case 1:
+                    w.Origin = new Vector3(s.Centre.x - s.Half.x - d, y, along);
+                    w.Yaw = 90f;
+                    break;
+                case 2:
+                    w.Origin = new Vector3(along, y, s.Centre.y + s.Half.y + d);
+                    w.Yaw = 180f;
+                    break;
+                default:
+                    w.Origin = new Vector3(along, y, s.Centre.y - s.Half.y - d);
+                    w.Yaw = 0f;
+                    break;
+            }
+
+            return w;
+        }
+
+        /// <summary>The local frame of a wall panel: origin on the wall, +z into the room, +y up (leaning back with the wall), +x along the wall.</summary>
+        private static void PushWall(AmMesh m, WallRef w)
+        {
+            m.Push(w.Origin, Quaternion.Euler(0f, w.Yaw, 0f) * Quaternion.Euler(-w.Lean, 0f, 0f));
         }
     }
 }

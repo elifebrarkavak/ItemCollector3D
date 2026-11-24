@@ -346,6 +346,12 @@ namespace ItemCollector3D.EditorTools.AncientMine
         {
             Transform markers = Child(env, "Markers");
             Child(markers, "PlayerSpawn", OnGround(AmLayout.Spawn.x, AmLayout.Spawn.z));
+            BuildRouteMarkers(markers);
+            BuildCandidateMarkers(markers);
+        }
+
+        private static void BuildRouteMarkers(Transform markers)
+        {
             Transform routes = Child(markers, "Routes");
             foreach ((string group, (string name, Vector2 point)[] points) in new[] { ("Main", AmLayout.MainRoute), ("Alternate", AmLayout.AlternateRoute) })
             {
@@ -365,6 +371,162 @@ namespace ItemCollector3D.EditorTools.AncientMine
                     Child(g, $"{i:00}", OnGround(points[i].x, points[i].y));
                 }
             }
+        }
+
+        /// <summary>Empty marker transforms for the places kept clear for the treasures of stage 16C (they are NOT treasures: nothing here is collectable).</summary>
+        private static void BuildCandidateMarkers(Transform markers)
+        {
+            Transform candidates = Child(markers, "TreasureCandidates");
+            foreach ((string id, Vector2 point, float lift) in AmLayout.TreasureCandidates)
+            {
+                Child(candidates, id, OnGround(point.x, point.y, lift));
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds ONLY the route markers and the treasure-candidate markers of the open Ancient Mine scene (nothing else in the scene is touched: not the shells, the props, the colliders, the
+        /// systems or the treasure groups) and saves.
+        /// </summary>
+        public static string RefreshMarkers()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            Transform markers = Root(scene, EnvironmentName).transform.Find("Markers");
+            foreach (string name in new[] { "Routes", "TreasureCandidates" })
+            {
+                Transform old = markers.Find(name);
+                if (old != null)
+                {
+                    Object.DestroyImmediate(old.gameObject);
+                }
+            }
+
+            AmLayout.ResetGrid();
+            BuildRouteMarkers(markers);
+            BuildCandidateMarkers(markers);
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            return $"markers refreshed: {markers.Find("Routes").childCount} route groups, {markers.Find("TreasureCandidates").childCount} treasure candidates";
+        }
+
+        /// <summary>
+        /// Regenerates the palette texture and the cave shell meshes IN PLACE (the same mesh assets, so every reference in the scene stays valid; the geometry is identical, only the swatch UVs follow
+        /// the palette layout) and re-assigns the shell colliders. Nothing else in the scene is touched.
+        /// </summary>
+        public static string RefreshShells()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            Texture2D palette = P.Build();
+            AmAssets.PaletteMaterial(palette);
+            AmAssets.GlowMaterial(palette);
+            Dictionary<AmZone, AmShell> shells = AmAssets.BuildShells();
+            Transform env = Root(scene, EnvironmentName).transform;
+            int triangles = 0;
+            foreach (string zoneName in AmDressing.ZoneNames)
+            {
+                AmShell shell = shells[AmDressing.ZoneOf(zoneName)];
+                foreach ((string part, Mesh mesh) in new[] { ("Floor", shell.Floor), ("Ceiling", shell.Ceiling) })
+                {
+                    Transform t = env.Find(zoneName + "/" + part);
+                    t.GetComponent<MeshFilter>().sharedMesh = mesh;
+                    var collider = t.GetComponent<MeshCollider>();
+                    collider.sharedMesh = null;
+                    collider.sharedMesh = mesh;
+                    triangles += mesh.triangles.Length / 3;
+                }
+            }
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            return $"shells refreshed: {triangles} triangles";
+        }
+
+        // ================================================================ lighting character per area (stage 16B)
+
+        private static CaveZoneMoodPreset[] ZoneMoods()
+        {
+            return new[]
+            {
+                // the Ancient Gate: a bright, cool welcome
+                new CaveZoneMoodPreset("A_AncientGate", new Color(0.54f, 0.60f, 0.92f), new Color(0.46f, 0.50f, 0.78f), new Color(0.28f, 0.26f, 0.46f), new Color(0.16f, 0.18f, 0.34f), 0.0055f),
+                // the Hall of Pillars: neutral, grand stone
+                new CaveZoneMoodPreset("B_HallOfPillars", new Color(0.52f, 0.52f, 0.66f), new Color(0.44f, 0.44f, 0.58f), new Color(0.27f, 0.25f, 0.35f), new Color(0.17f, 0.16f, 0.26f), 0.0055f),
+                // the Crystal Caverns: saturated blue and purple
+                new CaveZoneMoodPreset("C_CrystalCaverns", new Color(0.42f, 0.40f, 0.90f), new Color(0.34f, 0.30f, 0.76f), new Color(0.22f, 0.15f, 0.46f), new Color(0.16f, 0.12f, 0.36f), 0.0062f),
+                // the Forgotten Workshop: old and warm
+                new CaveZoneMoodPreset("D_ForgottenWorkshop", new Color(0.66f, 0.56f, 0.54f), new Color(0.58f, 0.46f, 0.40f), new Color(0.34f, 0.25f, 0.22f), new Color(0.25f, 0.17f, 0.15f), 0.006f),
+                // the Royal Vault: purple and turquoise
+                new CaveZoneMoodPreset("E_RoyalVault", new Color(0.66f, 0.50f, 0.96f), new Color(0.40f, 0.56f, 0.84f), new Color(0.38f, 0.22f, 0.54f), new Color(0.20f, 0.12f, 0.36f), 0.0055f),
+            };
+        }
+
+        private readonly struct CaveZoneMoodPreset
+        {
+            public readonly string Zone;
+            public readonly Color Sky, Equator, Ground, Fog;
+            public readonly float Density;
+
+            public CaveZoneMoodPreset(string zone, Color sky, Color equator, Color ground, Color fog, float density)
+            {
+                Zone = zone;
+                Sky = sky;
+                Equator = equator;
+                Ground = ground;
+                Fog = fog;
+                Density = density;
+            }
+        }
+
+        /// <summary>Adds (or updates) the CaveZoneMood object under GameplaySystems (the ambient and fog colour of each area). Idempotent; saves the scene.</summary>
+        public static string AddZoneMood()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            Transform systems = Root(scene, "GameplaySystems").transform;
+            Transform t = systems.Find("CaveZoneMood");
+            if (t == null)
+            {
+                t = Child(systems, "CaveZoneMood");
+                t.gameObject.AddComponent<ItemCollector3D.World.CaveZoneMood>();
+            }
+
+            var so = new SerializedObject(t.GetComponent<ItemCollector3D.World.CaveZoneMood>());
+            so.FindProperty("target").objectReferenceValue = Root(scene, "Player").transform;
+            so.FindProperty("blendSeconds").floatValue = 1.8f;
+            CaveZoneMoodPreset[] presets = ZoneMoods();
+            SerializedProperty array = so.FindProperty("moods");
+            array.arraySize = presets.Length;
+            for (int i = 0; i < presets.Length; i++)
+            {
+                SerializedProperty e = array.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("zone").stringValue = presets[i].Zone;
+                e.FindPropertyRelative("ambientSky").colorValue = presets[i].Sky;
+                e.FindPropertyRelative("ambientEquator").colorValue = presets[i].Equator;
+                e.FindPropertyRelative("ambientGround").colorValue = presets[i].Ground;
+                e.FindPropertyRelative("fogColor").colorValue = presets[i].Fog;
+                e.FindPropertyRelative("fogDensity").floatValue = presets[i].Density;
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            // the camera helper (the reused MineInteriorZone) fades the ambient to ITS mood colours when the camera is inside the cave: those are the Gate's, so its first fade changes nothing
+            Transform interior = systems.Find("CaveInteriorZone");
+            if (interior != null)
+            {
+                var iso = new SerializedObject(interior.GetComponent<ItemCollector3D.World.MineInteriorZone>());
+                iso.FindProperty("ambientSky").colorValue = presets[0].Sky;
+                iso.FindProperty("ambientEquator").colorValue = presets[0].Equator;
+                iso.FindProperty("ambientGround").colorValue = presets[0].Ground;
+                iso.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            // the scene's own ambient is the Gate's: the player starts there, so nothing jumps when the mood takes over
+            RenderSettings.ambientSkyColor = presets[0].Sky;
+            RenderSettings.ambientEquatorColor = presets[0].Equator;
+            RenderSettings.ambientGroundColor = presets[0].Ground;
+            RenderSettings.fogColor = presets[0].Fog;
+            RenderSettings.fogDensity = presets[0].Density;
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            return $"CaveZoneMood: {presets.Length} moods";
         }
 
         private static void BuildTreasureRoot(Scene scene)
