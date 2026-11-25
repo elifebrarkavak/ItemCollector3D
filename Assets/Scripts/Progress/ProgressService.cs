@@ -48,6 +48,9 @@ namespace ItemCollector3D.Progress
         public string RecoveryNote { get; private set; } = string.Empty;
 
         public int TotalGold => data.totalGold;
+
+        /// <summary>The Green Mine tutorial: Pending only after NEW GAME (and until it is finished or skipped); older saves read as NotOffered.</summary>
+        public TutorialStatus Tutorial => (TutorialStatus)Mathf.Clamp(data.tutorialState, 0, (int)TutorialStatus.Finished);
         public IReadOnlyList<string> CollectedTreasureIds => data.collectedTreasureIds;
         public IReadOnlyList<string> UnlockedAreaIds => data.unlockedAreaIds;
         public IReadOnlyList<string> CompletedAreaIds => data.completedAreaIds;
@@ -159,6 +162,18 @@ namespace ItemCollector3D.Progress
             return RegisterResult.Accepted;
         }
 
+        /// <summary>Records the tutorial state and saves (nothing else changes; no events). Returns whether the save succeeded.</summary>
+        public bool SetTutorial(TutorialStatus status)
+        {
+            if (Tutorial == status && data.tutorialState == (int)status)
+            {
+                return true;
+            }
+
+            data.tutorialState = (int)status;
+            return Save();
+        }
+
         public bool Save()
         {
             return store.Write(JsonUtility.ToJson(data));
@@ -182,6 +197,7 @@ namespace ItemCollector3D.Progress
         public bool StartNewGame()
         {
             GameProgressData fresh = NewData();
+            fresh.tutorialState = (int)TutorialStatus.Pending; // a new game gets the Green Mine tutorial (stage 17B)
             bool written;
             try
             {
@@ -310,6 +326,7 @@ namespace ItemCollector3D.Progress
         {
             var notes = new List<string>();
 
+            d.tutorialState = Mathf.Clamp(d.tutorialState, 0, (int)TutorialStatus.Finished);
             d.collectedTreasureIds ??= new List<string>();
             d.unlockedAreaIds ??= new List<string>();
             d.completedAreaIds ??= new List<string>();

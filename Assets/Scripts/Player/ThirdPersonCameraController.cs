@@ -42,6 +42,12 @@ namespace ItemCollector3D.Player
 
         public Transform Target => target;
 
+        /// <summary>The camera's heading in degrees (the tutorial watches it change while the player drags).</summary>
+        public float Yaw => yaw;
+
+        /// <summary>True in a frame in which the player's own orbit input (right mouse button or a touch on the right half) moved the camera.</summary>
+        public bool OrbitInputActive => orbitInputActive;
+
         /// <summary>The orbit distance currently in force (the configured distance times the level's scale, e.g. shortened inside the mine).</summary>
         public float EffectiveDistance => distance * environmentDistanceScale;
 
