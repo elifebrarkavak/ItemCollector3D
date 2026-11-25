@@ -25,6 +25,9 @@ namespace ItemCollector3D.Menus
         public int ShownCount => shown.Count;
         public IReadOnlyCollection<string> ShownKeys => shown;
 
+        /// <summary>True while a banner is on screen or waiting for its turn (the LEVEL COMPLETE panel waits for this to end, stage 17C).</summary>
+        public bool IsBusy => queue.Count > 0 || (banner != null && banner.IsShowing);
+
         private void OnEnable()
         {
             Subscribe();

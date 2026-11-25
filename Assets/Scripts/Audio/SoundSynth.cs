@@ -152,6 +152,29 @@ namespace ItemCollector3D.Audio
             return Build("CollectEpic", s, SfxRate, 0.85f, 0.12f);
         }
 
+        public const float LevelCompleteSeconds = 1.8f;
+
+        /// <summary>
+        /// LEVEL COMPLETE (stage 17C): a short rising C-major bell arpeggio that settles into a soft chord. Quieter and shorter than the Epic reward chime (it follows it), one clip, played once.
+        /// </summary>
+        public static AudioClip LevelComplete()
+        {
+            int n = Samples(LevelCompleteSeconds, SfxRate);
+            var s = new float[n];
+            float[] arpeggio = { 523.25f, 659.25f, 783.99f, 1046.5f }; // C5 E5 G5 C6
+            for (int k = 0; k < arpeggio.Length; k++)
+            {
+                Bell(s, SfxRate, 0.11f * k, arpeggio[k], 0.8f, 5.5f);
+            }
+
+            // the settled chord (C6 E6 G6) a little later, with a slow decay
+            Bell(s, SfxRate, 0.5f, 1046.5f, 0.7f, 2.6f);
+            Bell(s, SfxRate, 0.5f, 1318.5f, 0.55f, 2.8f);
+            Bell(s, SfxRate, 0.5f, 1568f, 0.45f, 3.0f);
+            Bell(s, SfxRate, 0.5f, 523.25f, 0.5f, 2.4f);
+            return Build("LevelComplete", s, SfxRate, 0.7f, 0.25f);
+        }
+
         // ------------------------------------------------------------------ ambience loops
 
         public const float ForestSeconds = 10f;

@@ -76,6 +76,16 @@ namespace ItemCollector3D.EditorTools
 
             BuildHudSprites();
             BuildAreaSprites();
+            BuildCelebrationSprites();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>Sprites of the LEVEL COMPLETE panel (stage 17C): the gold trophy and a small star. Only generates what is new, the rest of the set is untouched.</summary>
+        public static void BuildCelebrationSprites()
+        {
+            Directory.CreateDirectory(Folder);
+            Save("icon_trophy", IconTrophy(), 0);
+            Save("icon_star", IconStar(), 0);
             AssetDatabase.Refresh();
         }
 
@@ -301,6 +311,48 @@ namespace ItemCollector3D.EditorTools
             rs.Fill(Polygon(new Vector2(26, 42), new Vector2(60, 42), new Vector2(64, 116)), Gold);
             rs.Fill(Polygon(new Vector2(102, 42), new Vector2(68, 42), new Vector2(64, 116)), GoldDark);
             rs.Fill(Polygon(new Vector2(60, 42), new Vector2(68, 42), new Vector2(64, 116)), Hex("#E0A12B"));
+            return rs;
+        }
+
+        private static Raster IconTrophy()
+        {
+            var rs = new Raster(128, 128);
+            // the cup: a rim, a rounded bowl, two ring handles, a neck and a two-step base
+            Sdf bowl = Union(RoundRectBox(30, 12, 98, 28, 6), Intersect(Circle(64, 36, 35), (x, y) => 20f - y));
+            Sdf handleL = Intersect(Ring(31, 38, 14f, 5f), (x, y) => x - 36f);
+            Sdf handleR = Intersect(Ring(97, 38, 14f, 5f), (x, y) => 92f - x);
+            Sdf neck = Polygon(new Vector2(55, 66), new Vector2(73, 66), new Vector2(77, 90), new Vector2(51, 90));
+            Sdf baseTop = RoundRectBox(38, 88, 90, 104, 6);
+            Sdf baseBottom = RoundRectBox(28, 102, 100, 118, 6);
+            Sdf all = Union(bowl, handleL, handleR, neck, baseTop, baseBottom);
+            rs.Fill(Grow(Offset(all, 0f, 3f), 5f), new Color(0f, 0f, 0f, 0.28f));
+            rs.Fill(Grow(all, 5f), Outline);
+            rs.Fill(Union(handleL, handleR), Gold);
+            rs.Fill(bowl, HorizontalGradient(30, 98, GoldLight, GoldDark));
+            rs.Fill(neck, HorizontalGradient(51, 77, Gold, GoldDark));
+            rs.Fill(baseTop, HorizontalGradient(38, 90, Gold, GoldDark));
+            rs.Fill(baseBottom, HorizontalGradient(28, 100, GoldLight, GoldDeep));
+            rs.Fill(Subtract(bowl, Offset(bowl, 0f, 4f)), Hex("#FFF3C4")); // bright rim
+            rs.Fill(RoundRectBox(40, 30, 49, 56, 4), new Color(1f, 1f, 1f, 0.55f)); // shine on the bowl
+            rs.Fill(Polygon(new Vector2(64, 30), new Vector2(68, 40), new Vector2(79, 41), new Vector2(70, 48), new Vector2(73, 59), new Vector2(64, 53), new Vector2(55, 59), new Vector2(58, 48), new Vector2(49, 41), new Vector2(60, 40)), Hex("#FFF3C4")); // star on the cup
+            return rs;
+        }
+
+        private static Raster IconStar()
+        {
+            var rs = new Raster(128, 128);
+            var points = new Vector2[10];
+            for (int i = 0; i < 10; i++)
+            {
+                float angle = -Mathf.PI * 0.5f + i * Mathf.PI / 5f;
+                float r = i % 2 == 0 ? 56f : 25f;
+                points[i] = new Vector2(64f + Mathf.Cos(angle) * r, 68f + Mathf.Sin(angle) * r);
+            }
+
+            Sdf star = Polygon(points);
+            rs.Fill(Grow(Offset(star, 0f, 3f), 5f), new Color(0f, 0f, 0f, 0.28f));
+            rs.Fill(Grow(star, 5f), Outline);
+            rs.Fill(star, VerticalGradient(12f, 124f, Hex("#FFF3C4"), Gold));
             return rs;
         }
 

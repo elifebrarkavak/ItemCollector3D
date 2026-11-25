@@ -86,6 +86,14 @@ namespace ItemCollector3D.Menus
             }
         }
 
+        private void Start()
+        {
+            if (SceneNavigator.ConsumeAreaSelectionRequest())
+            {
+                OpenAreaSelect(); // coming back from a finished level: straight to the Area Selection (BACK still leads to the Main Menu)
+            }
+        }
+
         private void OnDestroy()
         {
             if (settingsPanel != null)
