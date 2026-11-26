@@ -52,7 +52,6 @@ namespace ItemCollector3D.EditorTools.AncientMine
             Ribbon(c, new List<Vector2> { new(-58f, -5.45f), new(-24f, -5.45f) }, 0.14f, P.GoldBright, 0.09f);
             Ribbon(c, new List<Vector2> { new(-58f, 1.45f), new(-24f, 1.45f) }, 0.14f, P.GoldBright, 0.09f);
             Ribbon(c, road, 0.4f, P.RoadInlay, 0.1f, true);
-            FloorSun(c, -52.5f, -2f, 3.6f, f, P.Gold, P.RoadInlay);
 
             // ---- the second arch over the way out, and the two great guardians that flank the road (they face each other across it)
             OrnateGateway(c, new Vector3(-38.6f, c.Floor(-38.6f, -2f), -2f), 90f, 4.9f, 1.7f, 2.6f, 8f, stone, dark, P.Gold, P.GoldBright);

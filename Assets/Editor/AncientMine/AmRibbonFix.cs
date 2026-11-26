@@ -41,6 +41,30 @@ namespace ItemCollector3D.EditorTools.AncientMine
             return list;
         }
 
+        /// <summary>
+        /// Patches the structure mesh of a REGENERATED zone again (null = every zone). DressZone refills the mesh asset but keeps its name, so the "+ribbonfix" suffix lies about a mesh that is
+        /// no longer patched: this forgets the suffix of the named zone(s) only (a mesh that really is patched must never be patched twice) and runs <see cref="Apply"/>.
+        /// </summary>
+        public static string Reapply(string zoneName)
+        {
+            GameObject env = GameObject.Find("AncientMineEnvironment");
+            foreach (MeshRenderer mr in env.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (mr.name != "Structures" || (zoneName != null && mr.transform.parent.parent.name != zoneName))
+                {
+                    continue;
+                }
+
+                Mesh mesh = mr.GetComponent<MeshFilter>().sharedMesh;
+                if (mesh.name.EndsWith(Marker))
+                {
+                    mesh.name = mesh.name.Substring(0, mesh.name.Length - Marker.Length);
+                }
+            }
+
+            return Apply(false);
+        }
+
         public static string Apply(bool dryRun)
         {
             Physics.SyncTransforms();

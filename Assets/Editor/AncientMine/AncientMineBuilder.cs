@@ -98,6 +98,8 @@ namespace ItemCollector3D.EditorTools.AncientMine
             Scene scene = SceneManager.GetActiveScene();
             Transform env = Root(scene, EnvironmentName).transform;
             string result = AmDressing.DressZone(env, zoneName);
+            // the rebuilt zone has a new mesh (no ribbon patch) and new objects (the glow manager lost its renderers): repair both (stage 19A)
+            result += "\n" + AmRibbonFix.Reapply(zoneName) + "\n" + AmAtmosphere.RelinkGlow();
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             return result;

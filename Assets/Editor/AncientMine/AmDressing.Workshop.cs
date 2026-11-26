@@ -252,20 +252,12 @@ namespace ItemCollector3D.EditorTools.AncientMine
                 }
             }
 
-            // ---- the collapsed spur: sealed by a fall of rock, timbers and red flags: the dead end can not be mistaken for a way on
+            // ---- the collapsed spur: sealed by a fall of rock (stage 19A: the crossed timbers and the red flags that the miner could walk into were removed)
             Rubble(c, -37.2f, 15.4f, 2.0f, 21, true, true);
             Rubble(c, -34.0f, 14.4f, 2.2f, 22, true, true);
             Rubble(c, -31.8f, 16.6f, 1.6f, 23, true, true);
             Rubble(c, -30.6f, 19.0f, 1.4f, 24, true, true);
             Rubble(c, -37.6f, 19.2f, 1.5f, 25, true, true);
-            m.Beam(c.On(-37f, 22.0f, 1.0f), c.On(-30f, 22.6f, 2.4f), 0.3f, 0.3f, P.WoodAged);
-            m.Beam(c.On(-37f, 22.0f, 2.4f), c.On(-30f, 22.6f, 1.0f), 0.3f, 0.3f, P.WoodAged);
-            foreach (var p in new[] { new Vector2(-36.3f, 22.0f), new Vector2(-29.7f, 22.6f) })
-            {
-                Vector3 b = c.On(p.x, p.y);
-                m.Block(b, V(0.14f, 3.0f, 0.14f), P.WoodAged, P.WoodAged);
-                m.Box(b + V(0.5f, 2.5f, 0f), V(0.95f, 0.6f, 0.05f), P.ClothRed, P.ClothRed);
-            }
 
             // ---- roof: warm rock spikes
             for (int k = 0; k < 24; k++)

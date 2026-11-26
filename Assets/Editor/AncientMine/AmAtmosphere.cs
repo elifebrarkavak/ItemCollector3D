@@ -148,6 +148,54 @@ namespace ItemCollector3D.EditorTools.AncientMine
             return $"{RootName}: glow entries {entries.Count}, motes 4, {notice}";
         }
 
+        /// <summary>
+        /// Points the crystal-glow entries whose renderer is gone back at the zone's "Crystals" mesh (slot -1) or the gold slot (1) of its "Structures" mesh. A zone rebuild (DressZoneInOpenScene)
+        /// destroys and recreates everything under the zone roots, which silently nulls these references. Returns how many entries were repaired.
+        /// </summary>
+        public static string RelinkGlow()
+        {
+            MineCrystalGlow glow = Object.FindAnyObjectByType<MineCrystalGlow>(FindObjectsInactive.Include);
+            GameObject env = GameObject.Find("AncientMineEnvironment");
+            if (glow == null || env == null)
+            {
+                return "no glow manager or no environment in the open scene";
+            }
+
+            var so = new SerializedObject(glow);
+            SerializedProperty array = so.FindProperty("entries");
+            int repaired = 0;
+            for (int i = 0; i < array.arraySize; i++)
+            {
+                SerializedProperty e = array.GetArrayElementAtIndex(i);
+                SerializedProperty r = e.FindPropertyRelative("renderer");
+                if (r.objectReferenceValue != null)
+                {
+                    continue;
+                }
+
+                Transform zoneRoot = env.transform.Find(ZoneRoots[e.FindPropertyRelative("zone").enumValueIndex]);
+                string meshName = e.FindPropertyRelative("materialIndex").intValue < 0 ? "Crystals" : "Structures";
+                if (zoneRoot == null)
+                {
+                    continue;
+                }
+
+                foreach (MeshRenderer mr in zoneRoot.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    if (mr.name == meshName)
+                    {
+                        r.objectReferenceValue = mr;
+                        repaired++;
+                        break;
+                    }
+                }
+            }
+
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorSceneManager.MarkSceneDirty(glow.gameObject.scene);
+            return $"glow entries repaired: {repaired} of {array.arraySize}";
+        }
+
         private static Material FindMote()
         {
             foreach (string guid in AssetDatabase.FindAssets("RC_Mote t:Material"))

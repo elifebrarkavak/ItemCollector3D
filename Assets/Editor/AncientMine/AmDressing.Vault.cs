@@ -50,10 +50,7 @@ namespace ItemCollector3D.EditorTools.AncientMine
             Ribbon(c, new List<Vector2> { new(41f, -40.1f), new(28f, -40.1f), new(10f, -41.1f) }, 0.14f, P.GoldBright, 0.09f);
             Ribbon(c, road, 0.4f, P.RoadInlay, 0.1f, true);
 
-            // ---- the central dais: gold rings and a gold border on top, the altar on its north side (the way across and the centre stay free for the treasures of stage 16C)
-            FloorDisc(c, 10f, -38f, 4.0f, P.GoldDark, dais + 0.05f, 24, false, dais - 0.05f);
-            FloorDisc(c, 10f, -38f, 3.4f, P.Rock(Z, 6), dais + 0.06f, 24, false, dais - 0.05f);
-            FloorSun(c, 10f, -38f, 2.3f, dais - 0.05f, P.Gold, P.PortalGlowBright);
+            // ---- the central dais (stage 19A: the gold disc and the floor sun on top were removed, they flickered and the miner sank into them): a gold border on top, the altar on its north side (the way across and the centre stay free for the treasures of stage 16C)
             for (int side = -1; side <= 1; side += 2)
             {
                 m.Box(new Vector3(10f, dais + 0.03f, -38f + side * 4.35f), new Vector3(13.6f, 0.06f, 0.3f), P.GoldBright, P.GoldBright);
