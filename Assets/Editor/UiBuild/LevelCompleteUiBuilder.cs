@@ -152,6 +152,7 @@ namespace ItemCollector3D.EditorTools
                     t.gameObject.layer = uiLayer; // like the rest of the HUD: no per-object layer overrides in the scenes
                 }
 
+                Celebration18dPolish.ApplyLevelComplete(root); // stage 18D: the final layout (the same one PolishPrefabs applies to the existing prefab)
                 panel.gameObject.SetActive(false);
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             }
