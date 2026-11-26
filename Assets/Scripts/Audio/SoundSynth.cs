@@ -175,6 +175,37 @@ namespace ItemCollector3D.Audio
             return Build("LevelComplete", s, SfxRate, 0.7f, 0.25f);
         }
 
+        public const float GameCompleteSeconds = 3.4f;
+
+        /// <summary>
+        /// GAME COMPLETE (stage 17D): a longer, fuller fanfare than <see cref="LevelComplete"/>: a rising six-bell C-major run, a held chord that opens up an octave higher, and a last sparkle. Still soft and
+        /// bell-like (no brass, nothing sharp), one clip played once, built on the first celebration. Quieter peak than the effects, silent at both ends.
+        /// </summary>
+        public static AudioClip GameComplete()
+        {
+            int n = Samples(GameCompleteSeconds, SfxRate);
+            var s = new float[n];
+            float[] run = { 392f, 523.25f, 659.25f, 783.99f, 1046.5f, 1318.5f }; // G4 C5 E5 G5 C6 E6
+            for (int k = 0; k < run.Length; k++)
+            {
+                Bell(s, SfxRate, 0.13f * k, run[k], 0.8f, 4.6f);
+            }
+
+            // the held chord: C major spread over two octaves, slow decay
+            const float chord = 0.85f;
+            Bell(s, SfxRate, chord, 261.63f, 0.55f, 1.5f);
+            Bell(s, SfxRate, chord, 523.25f, 0.6f, 1.7f);
+            Bell(s, SfxRate, chord, 659.25f, 0.5f, 1.8f);
+            Bell(s, SfxRate, chord, 783.99f, 0.5f, 1.9f);
+            Bell(s, SfxRate, chord, 1046.5f, 0.45f, 2.0f);
+
+            // the last sparkle: three high bells that twinkle down
+            Bell(s, SfxRate, 1.55f, 2093f, 0.28f, 4.0f);
+            Bell(s, SfxRate, 1.7f, 1568f, 0.24f, 4.0f);
+            Bell(s, SfxRate, 1.85f, 1975.5f, 0.2f, 4.0f);
+            return Build("GameComplete", s, SfxRate, 0.7f, 0.4f);
+        }
+
         // ------------------------------------------------------------------ ambience loops
 
         public const float ForestSeconds = 10f;

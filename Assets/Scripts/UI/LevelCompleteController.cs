@@ -88,6 +88,7 @@ namespace ItemCollector3D.UI
         [SerializeField] private FloatingRewardText rewardText;
         [SerializeField] private ProgressNotificationPresenter notifications;
         [SerializeField] private TutorialController tutorial;
+        [SerializeField] private FinalCelebrationController finals;
 
         [Header("Panel (built by LevelCompleteUiBuilder)")]
         [SerializeField] private GameObject panelRoot;
@@ -170,6 +171,7 @@ namespace ItemCollector3D.UI
             rewardText = rewardText != null ? rewardText : FindInScene<FloatingRewardText>();
             notifications = notifications != null ? notifications : FindInScene<ProgressNotificationPresenter>();
             tutorial = tutorial != null ? tutorial : FindInScene<TutorialController>();
+            finals = finals != null ? finals : FindInScene<FinalCelebrationController>();
 
             if (nextButton != null) { nextButton.onClick.AddListener(OnNextTapped); }
             if (stayButton != null) { stayButton.onClick.AddListener(Stay); }
@@ -365,6 +367,12 @@ namespace ItemCollector3D.UI
         {
             if (Time.frameCount <= waitFrame || GamePause.IsPaused)
             {
+                return;
+            }
+
+            if (finals != null && finals.IsActive)
+            {
+                quiet = 0f; // stage 17D: a final celebration (GAME COMPLETE / 100% COLLECTION) of the same moment comes first, however long it waits (its time does not count here); this panel stays owed in the save and follows
                 return;
             }
 

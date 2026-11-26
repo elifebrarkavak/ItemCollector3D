@@ -39,5 +39,14 @@ namespace ItemCollector3D.Progress
         /// STAY HERE / GO TO / AREA SELECTION). A scene change or a restart in between cannot lose the celebration: the area shows it once the next time it is entered. Saves from before it read as empty.
         /// </summary>
         public List<string> pendingCelebrationAreaIds = new();
+
+        /// <summary>
+        /// Final achievements (stage 17D, <see cref="FinalAchievements"/>) whose celebration is OWED: the goal was crossed by a COLLECT (written in the same save as that gold) and the player has not answered the
+        /// panel yet. Whether the goal is reached is NOT stored here (it follows from <see cref="totalGold"/> and <see cref="collectedTreasureIds"/>). Saves from before 17D do not contain the field and read as empty.
+        /// </summary>
+        public List<string> pendingAchievementIds = new();
+
+        /// <summary>Final achievements whose celebration the player already answered (never shown again until NEW GAME). A save from before 17D has none and is never "celebrated" on loading: the panel only follows a COLLECT.</summary>
+        public List<string> celebratedAchievementIds = new();
     }
 }
