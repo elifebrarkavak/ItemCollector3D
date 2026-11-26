@@ -98,6 +98,14 @@ namespace ItemCollector3D.EditorTools
             AssetDatabase.Refresh();
         }
 
+        /// <summary>The soft spotlight behind the control the tutorial points at (stage 18C): fully opaque up to half the radius, then a smooth fade to nothing. Only generates this one sprite.</summary>
+        public static void BuildTutorialHaloSprite()
+        {
+            Directory.CreateDirectory(Folder);
+            Save("ui_halo", Halo(128), 0);
+            AssetDatabase.Refresh();
+        }
+
         /// <summary>Sprites of the gameplay HUD (stage 9): pickaxe icon, translucent joystick, gold progress fill, signal-meter pill.</summary>
         public static void BuildHudSprites()
         {
@@ -452,6 +460,19 @@ namespace ItemCollector3D.EditorTools
         }
 
         // ================================================================ misc
+
+        private static Raster Halo(int s)
+        {
+            var rs = new Raster(s, s);
+            float c = s * 0.5f;
+            rs.FillAll((x, y) =>
+            {
+                float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
+                float t = Mathf.Clamp01((1f - d) / 0.5f);
+                return new Color(1f, 1f, 1f, t * t * (3f - 2f * t));
+            });
+            return rs;
+        }
 
         private static Raster Glow(int s)
         {

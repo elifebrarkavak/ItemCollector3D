@@ -140,6 +140,20 @@ namespace ItemCollector3D.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        /// <summary>
+        /// Stage 18C: creates only the text material of the floating "+10 GOLD" reward. Same font as every title, but a firmer dark outline and a wide, soft dark glow behind the letters
+        /// (the mobile SDF underlay), so the gold stays readable on a bright path, a wooden mine frame or a dark crystal hall. Everything else stays as it is.
+        /// </summary>
+        public static void EnsureStage18cAssets(float outlineWidth = 0.36f, float underlayDilate = 0.5f, float underlaySoftness = 0.7f, float underlayAlpha = 0.7f)
+        {
+            System.IO.Directory.CreateDirectory(Folder);
+            Create("UI_Reward_Gold", Font, Hex("#1A1008"), outlineWidth, 0f, new Color(0.03f, 0.02f, 0.01f, underlayAlpha), 0f, -0.2f, underlaySoftness);
+            Material material = Load("UI_Reward_Gold");
+            material.SetFloat("_UnderlayDilate", underlayDilate);
+            EditorUtility.SetDirty(material);
+            AssetDatabase.SaveAssets();
+        }
+
         public static void BuildAll()
         {
             System.IO.Directory.CreateDirectory(Folder);

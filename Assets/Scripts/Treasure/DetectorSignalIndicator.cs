@@ -24,6 +24,14 @@ namespace ItemCollector3D.Treasure
         [SerializeField] private Color idleColor = new(0.35f, 0.35f, 0.35f, 0.8f);
         [SerializeField] private Color flashColor = new(1f, 0.85f, 0.1f, 1f);
 
+        [Header("Stage 18C look (all optional: without them the hint is a plain label and the lamp has no glow)")]
+        [Tooltip("The hint text built into a navy plate (readable on any background). Empty: the hint label is cloned from the status label at runtime.")]
+        [SerializeField] private TMP_Text hintText;
+        [Tooltip("The plate around the hint text: shown and hidden with it.")]
+        [SerializeField] private GameObject hintPlate;
+        [Tooltip("Soft halo behind the beat lamp: it lights up with every pulse, so the lamp reads as a lamp that blinks with the beeps.")]
+        [SerializeField] private Graphic beaconGlow;
+
         [Header("Level display (NO SIGNAL / SLOW / FAST / RAPID)")]
         [Tooltip("Level meter: the first bar is lit from SLOW, the second from FAST, the third at RAPID.")]
         [SerializeField] private Graphic[] levelBars;
@@ -87,7 +95,17 @@ namespace ItemCollector3D.Treasure
         public static bool IsInsideDigRange(float proximity) => proximity >= 0.999f;
 
         /// <summary>The short hint shown under the signal plate: empty when there is nothing to explain.</summary>
-        public string Hint => hintLabel != null && hintLabel.gameObject.activeSelf ? hintLabel.text : string.Empty;
+        public string Hint => hintLabel != null && HintRoot.activeSelf ? hintLabel.text : string.Empty;
+
+        /// <summary>What is switched on and off with the hint: the plate when there is one, else the label itself.</summary>
+        private GameObject HintRoot => hintPlate != null ? hintPlate : hintLabel.gameObject;
+
+        /// <summary>The hint text component (null before Awake) and its plate: the tests and the screenshot tools read them.</summary>
+        public TMP_Text HintText => hintLabel;
+
+        public GameObject HintPlate => hintPlate;
+
+        public Graphic BeaconGlow => beaconGlow;
 
         public int PulseCount { get; private set; }
 
@@ -182,7 +200,21 @@ namespace ItemCollector3D.Treasure
 
         private void CreateHintLabel()
         {
-            if (label == null || hintLabel != null)
+            if (hintLabel != null)
+            {
+                return;
+            }
+
+            if (hintText != null)
+            {
+                // stage 18C: the editor tool built the hint into a plate; only show / hide it
+                hintLabel = hintText;
+                hintLabel.raycastTarget = false;
+                (hintPlate != null ? hintPlate : hintLabel.gameObject).SetActive(false);
+                return;
+            }
+
+            if (label == null)
             {
                 return;
             }
@@ -228,9 +260,9 @@ namespace ItemCollector3D.Treasure
             }
 
             bool show = text.Length > 0;
-            if (hintLabel.gameObject.activeSelf != show)
+            if (HintRoot.activeSelf != show)
             {
-                hintLabel.gameObject.SetActive(show);
+                HintRoot.SetActive(show);
             }
 
             if (show)
@@ -269,6 +301,15 @@ namespace ItemCollector3D.Treasure
                 float amount = t * flashStrength;
                 flashGraphic.color = Color.Lerp(idleColor, flashColor, amount);
                 flashGraphic.rectTransform.localScale = Vector3.one * (1f + (maxPulseScale - 1f) * amount);
+            }
+
+            if (beaconGlow != null)
+            {
+                float t = flashDuration > 0f ? Mathf.Clamp01(flashTimer / flashDuration) : 0f;
+                float amount = t * flashStrength;
+                Color glow = flashColor;
+                glow.a = 0.9f * amount; // dark between the beats, lit while the lamp blinks
+                beaconGlow.color = glow;
             }
 
             if (detector != null)

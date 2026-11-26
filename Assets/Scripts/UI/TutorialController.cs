@@ -37,6 +37,13 @@ namespace ItemCollector3D.UI
         public const float LookDegrees = 30f;
         public const float CompleteShowSeconds = 2.6f;
 
+        /// <summary>The card pops in (a small scale-up, unscaled time) every time the step changes.</summary>
+        public const float CardPopSeconds = 0.18f;
+
+        /// <summary>The spotlight behind the control to use pulses between these two alphas (soft edge, so it never reads as a plate).</summary>
+        public const float HaloAlphaMin = 0.4f;
+        public const float HaloAlphaMax = 0.75f;
+
         /// <summary>The detector step is shown at least this long (the first treasure can be right next to the start: the player should still read what the signal means).</summary>
         public const float FindMinimumSeconds = 3f;
         public const string GreenMineAreaId = "green_mine";
@@ -84,11 +91,23 @@ namespace ItemCollector3D.UI
         [SerializeField] private RectTransform arrow;
         [SerializeField] private TMP_Text arrowLabel;
 
+        [Header("Stage 18C look (optional: the tutorial works without them)")]
+        [Tooltip("The gold coin at the left of the card: the step number, or the check mark when the tutorial is complete.")]
+        [SerializeField] private TMP_Text badgeNumber;
+        [SerializeField] private GameObject badgeCheck;
+        [Tooltip("One small dot per step: lit up to the current step.")]
+        [SerializeField] private Image[] stepPips;
+        [SerializeField] private Color pipOnColor = new(1f, 0.85f, 0.45f, 1f);
+        [SerializeField] private Color pipOffColor = new(0.38f, 0.47f, 0.62f, 0.85f);
+        [Tooltip("The gold glow behind the control to use is this many times the control's size.")]
+        [SerializeField, Min(1f)] private float haloScale = 1.35f;
+
         private Transform player;
         private Vector3 lastPlayerPosition;
         private float movedMetres, lookedDegrees, lastYaw;
         private float completeUntil;
         private float stepStarted;
+        private float cardShownAt = float.NegativeInfinity;
         private float nextArrow;
         private TreasureSpot guided;
         private bool started;
@@ -106,6 +125,31 @@ namespace ItemCollector3D.UI
         public RectTransform Highlight => highlight;
         public RectTransform SwipeHint => swipeHint;
         public RectTransform Arrow => arrow;
+
+        /// <summary>The card (plate) of the tutorial: the title, the hint and the step badge live in it.</summary>
+        public RectTransform Card => plateGroup != null ? (RectTransform)plateGroup.transform : null;
+
+        public string BadgeText => badgeNumber != null ? badgeNumber.text : string.Empty;
+        public bool BadgeShowsCheck => badgeCheck != null && badgeCheck.activeSelf;
+        public int LitPipCount
+        {
+            get
+            {
+                int lit = 0;
+                if (stepPips != null)
+                {
+                    foreach (Image pip in stepPips)
+                    {
+                        if (pip != null && pip.color.Equals(pipOnColor))
+                        {
+                            lit++;
+                        }
+                    }
+                }
+
+                return lit;
+            }
+        }
         public string CurrentTitle => titleLabel != null ? titleLabel.text : string.Empty;
         public string CurrentHint => hintLabel != null ? hintLabel.text : string.Empty;
         public float MovedMetres => movedMetres;
@@ -257,6 +301,9 @@ namespace ItemCollector3D.UI
                 hintLabel.text = Hints[(int)step];
             }
 
+            UpdateBadge(step);
+            cardShownAt = Time.unscaledTime;
+
             if (swipeHint != null)
             {
                 swipeHint.gameObject.SetActive(step == TutorialStep.Look);
@@ -288,6 +335,33 @@ namespace ItemCollector3D.UI
 
             UpdateHighlight();
             StepChanged?.Invoke(step);
+        }
+
+        /// <summary>The coin shows the step number (a check mark when complete) and the dots light up to the step: looks only, no game state.</summary>
+        private void UpdateBadge(TutorialStep step)
+        {
+            bool complete = step == TutorialStep.Complete;
+            if (badgeNumber != null)
+            {
+                badgeNumber.text = complete ? string.Empty : ((int)step).ToString();
+            }
+
+            if (badgeCheck != null)
+            {
+                badgeCheck.SetActive(complete);
+            }
+
+            if (stepPips != null)
+            {
+                int lit = complete ? StepCount : Mathf.Min((int)step, StepCount);
+                for (int i = 0; i < stepPips.Length; i++)
+                {
+                    if (stepPips[i] != null)
+                    {
+                        stepPips[i].color = i < lit ? pipOnColor : pipOffColor;
+                    }
+                }
+            }
         }
 
         private void HandleDigCompleted(TreasureSpot spot)
@@ -368,6 +442,22 @@ namespace ItemCollector3D.UI
             if (plateGroup != null)
             {
                 plateGroup.alpha = paused ? 0f : 1f; // nothing of the tutorial shows behind the pause menu
+                float pop = Mathf.Clamp01((Time.unscaledTime - cardShownAt) / CardPopSeconds);
+                float scale = Mathf.Lerp(0.94f, 1f, 1f - (1f - pop) * (1f - pop));
+                if (!Mathf.Approximately(plateGroup.transform.localScale.x, scale))
+                {
+                    plateGroup.transform.localScale = new Vector3(scale, scale, 1f);
+                }
+            }
+
+            // SKIP TUTORIAL is part of the tutorial: it is not shown behind the pause menu or a celebration either (and gives no tap there)
+            if (skipButton != null && Step != TutorialStep.Complete)
+            {
+                bool skipShown = skipButton.gameObject.activeSelf;
+                if (paused == skipShown)
+                {
+                    skipButton.gameObject.SetActive(!paused);
+                }
             }
 
             if (paused)
@@ -562,11 +652,11 @@ namespace ItemCollector3D.UI
                 Vector3 centre = (corners[0] + corners[2]) * 0.5f;
                 highlight.position = centre;
                 float scaleToHighlight = target.lossyScale.x / Mathf.Max(1e-4f, highlight.lossyScale.x);
-                highlight.sizeDelta = new Vector2(target.rect.width, target.rect.height) * scaleToHighlight * (1.35f + 0.12f * pulse);
+                highlight.sizeDelta = new Vector2(target.rect.width, target.rect.height) * scaleToHighlight * (haloScale + 0.12f * pulse);
                 if (highlightImage != null)
                 {
                     Color c = highlightImage.color;
-                    c.a = 0.55f + 0.4f * pulse;
+                    c.a = Mathf.Lerp(HaloAlphaMin, HaloAlphaMax, pulse);
                     highlightImage.color = c;
                 }
             }
