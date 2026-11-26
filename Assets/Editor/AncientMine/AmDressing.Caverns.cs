@@ -46,7 +46,6 @@ namespace ItemCollector3D.EditorTools.AncientMine
             FloorDisc(c, 48f, -4f, 5.2f, P.RoadStoneDark, 0.17f, 28);
             FloorDisc(c, 48f, -4f, 4.4f, P.RoadStone, 0.18f, 28);
             FloorRing(c, 48f, -4f, 3.6f, 3.75f, P.RoadInlay, 0.2f, 28, true);
-            FloorSun(c, 48f, -4f, 2.2f, gy + 0.1f, P.StoneViolet, P.CrystalCyanLight);
 
             Formation(c, 56.2f, -4f, 14.5f, 2, 10, 3.3f, 8f, 100, 0);
             placed++;
@@ -124,7 +123,6 @@ namespace ItemCollector3D.EditorTools.AncientMine
             FloorDisc(c, 37.8f, 9.8f, 1.7f, P.WaterDeep, 0.17f, 18, true);
             FloorDisc(c, 37.8f, 9.8f, 1.35f, P.WaterTurquoise, 0.19f, 18, true);
             FloorRing(c, 37.8f, 9.8f, 1.75f, 1.9f, P.GoldBright, 0.2f, 20, false);
-            FloorSun(c, 36f, 14f, 1.9f, g + 0.1f, P.StoneViolet, P.CrystalMagentaLight);
             for (int k = 0; k < 8; k++)
             {
                 float a = (k * 45f + 10f) * Mathf.Deg2Rad;

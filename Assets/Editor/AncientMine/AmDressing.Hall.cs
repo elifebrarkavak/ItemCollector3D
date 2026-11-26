@@ -23,7 +23,6 @@ namespace ItemCollector3D.EditorTools.AncientMine
             Ribbon(c, road, 0.4f, P.RoadInlay, 0.1f, true);
             FloorDisc(c, 0f, 0f, 7.6f, P.RoadStoneDark, 0.06f);
             FloorDisc(c, 0f, 0f, 6.2f, P.StatueMid, 0.07f);
-            FloorSun(c, 0f, 0f, 4.4f, f, P.Gold, P.RoadInlay);
             FloorRing(c, 0f, 0f, 8.1f, 8.3f, P.GoldBright, 0.08f, 36, false, f);
             FloorRing(c, 0f, 0f, 11.6f, 11.75f, P.Gold, 0.08f, 44, false, f);
             for (int k = 0; k < 8; k++)
