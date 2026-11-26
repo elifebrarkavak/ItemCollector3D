@@ -28,6 +28,7 @@ namespace ItemCollector3D.EditorTools
             Save("ui_btn_wood", Button(256, 128, 46, Hex("#9C6746"), WoodBrown, WoodDark, Hex("#C48A62")), 56);
             Save("ui_btn_green", Button(256, 128, 46, GreenLight, NaturalGreen, GreenDark, Hex("#9BE0C4")), 56);
             Save("ui_btn_navy", Button(256, 128, 46, NavyLight, Hex("#26364E"), NavyDeep, Hex("#5C7396")), 56);
+            Save("ui_btn_red", Button(256, 128, 46, Hex("#EE6A55"), Hex("#C23A2E"), Hex("#7A1F18"), Hex("#FFA695")), 56);
 
             // ------------------------------------------------ round buttons (128x128)
             Save("ui_round_navy", RoundButton(128, NavyLight, Hex("#26364E"), NavyDeep, Hex("#5C7396")), 0);
@@ -77,6 +78,14 @@ namespace ItemCollector3D.EditorTools
             BuildHudSprites();
             BuildAreaSprites();
             BuildCelebrationSprites();
+            AssetDatabase.Refresh();
+        }
+
+        /// <summary>The red "destructive" chunky button of the NEW GAME question (stage 18B), in the same shape and lighting as the gold, green and navy ones. Only generates what is new.</summary>
+        public static void BuildDestructiveSprites()
+        {
+            Directory.CreateDirectory(Folder);
+            Save("ui_btn_red", Button(256, 128, 46, Hex("#EE6A55"), Hex("#C23A2E"), Hex("#7A1F18"), Hex("#FFA695")), 56);
             AssetDatabase.Refresh();
         }
 

@@ -32,6 +32,8 @@ namespace ItemCollector3D.Menus
         [SerializeField] private TMP_Text newGameBody;
         [SerializeField] private Button cancelNewGameButton;
         [SerializeField] private Button confirmNewGameButton;
+        [Tooltip("The settings window itself (banner, sliders, BACK, NEW GAME): hidden while the NEW GAME question is open so nothing of it shows around the question.")]
+        [SerializeField] private GameObject settingsWindow;
         [Tooltip("Empty = the scene's ProgressManager (the one the Area Selection uses).")]
         [SerializeField] private ProgressManager progress;
 
@@ -54,6 +56,7 @@ namespace ItemCollector3D.Menus
         }
 
         private bool newGameAvailable;
+        private bool questionOnly; // opened straight from the Main Menu's NEW GAME button: leaving the question leaves the panel
         private bool listenersAdded;
         private bool refreshing; // changing a slider's min/max clamps its value and fires onValueChanged: ignore that
 
@@ -109,6 +112,7 @@ namespace ItemCollector3D.Menus
 
         public void Hide()
         {
+            questionOnly = false;
             CloseNewGameDialog();
             gameObject.SetActive(false);
         }
@@ -207,10 +211,39 @@ namespace ItemCollector3D.Menus
         {
             if (IsNewGameDialogOpen)
             {
-                CloseNewGameDialog(); // Escape / Back with the question open only closes the question
+                // Escape / Back with the question open only closes the question (it never confirms it). Opened straight from the Main Menu there is no settings window behind it: back to the menu.
+                CloseNewGameDialog();
+                if (questionOnly)
+                {
+                    LeaveQuestionOnly();
+                }
+
                 return;
             }
 
+            Hide();
+            Closed?.Invoke();
+        }
+
+        /// <summary>
+        /// The Main Menu's NEW GAME button: opens the panel with ONLY the question on screen (the settings window is not shown behind it). CANCEL, Back and the close paths return to the Main Menu; only
+        /// START NEW GAME resets anything.
+        /// </summary>
+        public void ShowNewGameQuestion()
+        {
+            if (!newGameAvailable || newGameDialog == null)
+            {
+                return;
+            }
+
+            gameObject.SetActive(true);
+            questionOnly = true;
+            ShowDialog(NewGameState.Confirm);
+        }
+
+        private void LeaveQuestionOnly()
+        {
+            questionOnly = false;
             Hide();
             Closed?.Invoke();
         }
@@ -248,6 +281,10 @@ namespace ItemCollector3D.Menus
         public void CancelNewGame()
         {
             CloseNewGameDialog();
+            if (questionOnly)
+            {
+                LeaveQuestionOnly();
+            }
         }
 
         /// <summary>START NEW GAME (or OK once the result is shown).</summary>
@@ -269,6 +306,11 @@ namespace ItemCollector3D.Menus
                 case NewGameState.Done:
                 case NewGameState.Failed:
                     CloseNewGameDialog();
+                    if (questionOnly)
+                    {
+                        LeaveQuestionOnly();
+                    }
+
                     break;
             }
         }
@@ -295,6 +337,11 @@ namespace ItemCollector3D.Menus
             if (newGameDialog != null)
             {
                 newGameDialog.SetActive(state != NewGameState.Closed);
+            }
+
+            if (settingsWindow != null)
+            {
+                settingsWindow.SetActive(state == NewGameState.Closed); // nothing of the settings window peeks around the question
             }
 
             if (newGameTitle != null)
@@ -342,6 +389,11 @@ namespace ItemCollector3D.Menus
             if (newGameDialog != null)
             {
                 newGameDialog.SetActive(false);
+            }
+
+            if (settingsWindow != null)
+            {
+                settingsWindow.SetActive(true);
             }
         }
 

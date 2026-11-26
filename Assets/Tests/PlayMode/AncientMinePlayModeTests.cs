@@ -328,7 +328,7 @@ namespace ItemCollector3D.Tests.PlayMode
             service.RegisterCollected("a", 1199);
             Assert.That(service.IsAreaUnlocked("ancient_mine"), Is.False, "1199 gold keeps it locked");
             Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", SceneNavigator.AncientMineScene).Availability, Is.EqualTo(AreaAvailability.Locked));
-            Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", SceneNavigator.AncientMineScene).GoldText, Is.EqualTo("1 GOLD TO UNLOCK"));
+            Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", SceneNavigator.AncientMineScene).RemainingGold, Is.EqualTo(1));
             service.RegisterCollected("b", 1);
             Assert.That(service.IsAreaUnlocked("ancient_mine"), Is.True, "1200 gold opens it");
             AreaCardState open = AreaSelectController.Evaluate(service, "ancient_mine", SceneNavigator.AncientMineScene);

@@ -415,6 +415,8 @@ namespace ItemCollector3D.Tests.PlayMode
             yield return null;
             Assert.That(store.WriteCount, Is.EqualTo(writes + 1), "the introduction and the Character Selection write no progress");
             AssertFresh(store.Json);
+            Assert.That(Find<AreaSelectController>("AreaPanel").IsOpen, Is.True, "stage 18B: choosing the miner after the introduction leads on to the Area Selection");
+            Find<Button>("AreaBackButton").onClick.Invoke(); // BACK: the Main Menu
 
             // the normal PLAY flow: Area Selection with the fresh game (Green Mine playable, 0 / 500)
             Assert.That(Find<Button>("PlayButton").gameObject.activeInHierarchy, Is.True);
@@ -433,7 +435,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
             Assert.That(green, Is.Not.Null);
             Assert.That(green.State.Availability, Is.EqualTo(AreaAvailability.Playable));
-            Assert.That(green.CaptionLabel.text, Is.EqualTo("0 / 500 COLLECTED"));
+            Assert.That(green.TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 15"));
         }
 
         [UnityTest]

@@ -2,6 +2,7 @@
 using System.Collections;
 using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
+using ItemCollector3D.Progress;
 using ItemCollector3D.UI;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
@@ -55,6 +56,7 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             loadedScene = default;
+            ProgressManager.StoreFactoryOverride = () => new MemoryProgressStore();
             if (gameView != null)
             {
                 yield return gameView.Restore(); // also when an assertion failed
@@ -69,6 +71,7 @@ namespace ItemCollector3D.Tests.PlayMode
 
         private IEnumerator LoadScene(string path)
         {
+            ProgressManager.StoreFactoryOverride = ProgressTestIsolation.SavedGame; // a game in progress: PLAY opens the Area Selection (a first launch starts the introduction, stage 18B)
             AsyncOperation load = EditorSceneManager.LoadSceneAsyncInPlayMode(path, new LoadSceneParameters(LoadSceneMode.Additive));
             Assert.That(load, Is.Not.Null, path);
             yield return load;

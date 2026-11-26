@@ -28,6 +28,7 @@ namespace ItemCollector3D.EditorTools
         private const float PlayHeight = 176f;
         private const float MenuButtonHeight = TouchUnits;
         private const float MenuGap = 22f;
+        private const float MenuHalfWidth = (MenuColumnWidth - 20f) * 0.5f;   // EXIT and NEW GAME share the bottom row (stage 18B): half width each, still 128 high
 
         // Main Menu vertical layout (see ApplyMainMenuElasticLayout). Reference = the 1080 unit high canvas minus the 5.5 % gesture margin of the SafeAreaRoot,
         // i.e. a 16:9 screen without notch: there the menu is exactly the authored design. On a screen with a bottom inset (iPhone home indicator) the
@@ -81,22 +82,27 @@ namespace ItemCollector3D.EditorTools
                 Center(newGame.GetComponent<RectTransform>(), new Vector2(SettingsPanelController.ButtonPairOffset, -240f), new Vector2(520f, 132f));
                 newGame.gameObject.SetActive(false);
 
-                // the "START A NEW GAME?" question, on top of everything in this panel (a full dim also blocks touches behind it)
+                // the "START A NEW GAME?" question, on top of everything in this panel (a full dim also blocks touches behind it; a tap outside the question does nothing).
+                // Stage 18B: CANCEL is the big, calm green button; START NEW GAME is the smaller RED one; the settings window is hidden while the question is open.
                 var dialog = Rect("NewGameDialog", root.transform);
                 Stretch(dialog);
-                Dim(dialog, 0.74f);
-                RectTransform question = WoodWindow(dialog, new Vector2(1240f, 640f));
+                Dim(dialog, 0.82f);
+                RectTransform question = WoodWindow(dialog, new Vector2(1240f, 560f));
                 question.anchoredPosition = new Vector2(0f, -10f);
                 Entrance(question.gameObject, UiEntrance.Style.Pop, 0f, 0.2f);
                 TitleBanner(question, "START A NEW GAME?", new Vector2(980f, 150f), 66f, new Vector2(0f, -4f));
                 TextMeshProUGUI body = BodyText(question, "Body", SettingsPanelController.ConfirmBody, 46f, Cream, TextAlignmentOptions.Center);
                 body.textWrappingMode = TextWrappingModes.Normal;
                 body.overflowMode = TextOverflowModes.Overflow;
-                Center(body.rectTransform, new Vector2(0f, 26f), new Vector2(1020f, 190f));
-                Button cancel = TextButton(question, "CancelButton", "CANCEL", ButtonStyle.Green, new Vector2(520f, 132f), 66f);
-                Center(cancel.GetComponent<RectTransform>(), new Vector2(-SettingsPanelController.ButtonPairOffset, -200f), new Vector2(520f, 132f));
-                Button confirm = TextButton(question, "ConfirmButton", "START NEW GAME", ButtonStyle.Gold, new Vector2(520f, 132f), 50f);
-                Center(confirm.GetComponent<RectTransform>(), new Vector2(SettingsPanelController.ButtonPairOffset, -200f), new Vector2(520f, 132f));
+                Center(body.rectTransform, new Vector2(0f, 52f), new Vector2(1020f, 190f));
+                Button cancel = TextButton(question, "CancelButton", "CANCEL", ButtonStyle.Green, new Vector2(560f, 148f), 72f);
+                Center(cancel.GetComponent<RectTransform>(), new Vector2(-SettingsPanelController.ButtonPairOffset, -170f), new Vector2(560f, 148f));
+                Button confirm = TextButton(question, "ConfirmButton", "START NEW GAME", ButtonStyle.Red, new Vector2(480f, 128f), 46f);
+                Center(confirm.GetComponent<RectTransform>(), new Vector2(SettingsPanelController.ButtonPairOffset, -170f), new Vector2(480f, 128f));
+                TMP_Text confirmLabel = confirm.transform.Find("Label").GetComponent<TMP_Text>();
+                confirmLabel.enableAutoSizing = true;
+                confirmLabel.fontSizeMin = 28f;
+                confirmLabel.fontSizeMax = 46f;
                 dialog.gameObject.SetActive(false);
 
                 var controller = root.GetComponent<SettingsPanelController>();
@@ -110,6 +116,7 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "closeButton", close);
                 SetRef(controller, "newGameButton", newGame);
                 SetRef(controller, "newGameDialog", dialog.gameObject);
+                SetRef(controller, "settingsWindow", window.gameObject);
                 SetRef(controller, "newGameTitle", question.Find("TitleBanner/Heading").GetComponent<TMP_Text>());
                 SetRef(controller, "newGameBody", body);
                 SetRef(controller, "cancelNewGameButton", cancel);
@@ -132,14 +139,17 @@ namespace ItemCollector3D.EditorTools
             Image iconImage = Img(row, "Icon", S(icon), Color.white, false);
             Place(iconImage.rectTransform, new Vector2(0f, 0.5f), new Vector2(26f, 0f), new Vector2(80f, 80f));
 
-            // small text: the upright body font (the slanted display font is for titles and big buttons)
-            TextMeshProUGUI text = BodyText(row, "Label", label, 40f, Cream);
+            // the row names use the same slanted display font as the Main Menu buttons (stage 18B), fitted so the longest one never runs into the slider
+            TextMeshProUGUI text = Text(row, "Label", label.ToUpperInvariant(), 46f, "UI_Title_Gold", Cream, TextAlignmentOptions.MidlineLeft);
             Place(text.rectTransform, new Vector2(0f, 0.5f), new Vector2(124f, 0f), new Vector2(392f, 96f));
+            text.enableAutoSizing = true;
+            text.fontSizeMin = 28f;
+            text.fontSizeMax = 46f;
 
             Slider slider = BuildSlider(row);
             Place(slider.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(172f, 0f), new Vector2(390f, TouchUnits));
 
-            TextMeshProUGUI value = BodyText(row, "Value", "100%", 44f, Gold, TextAlignmentOptions.MidlineRight, "UI_Body_Gold");
+            TextMeshProUGUI value = Text(row, "Value", "100%", 50f, "UI_Title_Gold", GoldLight, TextAlignmentOptions.MidlineRight);
             Place(value.rectTransform, new Vector2(1f, 0.5f), new Vector2(-28f, 0f), new Vector2(150f, 96f));
             value.rectTransform.pivot = new Vector2(1f, 0.5f);
             valueLabel = value;
@@ -321,6 +331,7 @@ namespace ItemCollector3D.EditorTools
                 Button settings = MenuButton(buttons, "SettingsButton", "SETTINGS", ButtonStyle.Wood, ref y, MenuButtonHeight, 54f, "icon_gear", 62f, 0.12f, false);
                 Button exit = MenuButton(buttons, "ExitButton", "EXIT", ButtonStyle.Navy, ref y, MenuButtonHeight, 54f, "icon_exit", 62f, 0.17f, false);
                 ApplyMainMenuElasticLayout(titleRoot, buttons, (RectTransform)play.transform, (RectTransform)character.transform, (RectTransform)settings.transform, (RectTransform)exit.transform);
+                ContinueControls continueControls = AddContinueControls(buttons, play, exit);
 
                 // ---- sub screens (hidden until opened): rendered after the buttons so they sit on top
                 var settingsInstance = (GameObject)PrefabUtility.InstantiatePrefab(settingsPrefab, root.transform);
@@ -346,6 +357,7 @@ namespace ItemCollector3D.EditorTools
                 SetRef(controller, "characterPanel", selectController);
                 SetRef(controller, "areaPanel", areaController);
                 SetRef(controller, "introPanel", introController);
+                WireContinueControls(controller, continueControls);
                 PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
             }
             finally
@@ -387,21 +399,132 @@ namespace ItemCollector3D.EditorTools
             // inside the container (height Hc = 560 + 3 gaps): EXIT sits on the bottom, PLAY hangs from the top, the two middle buttons at thirds of Hc,
             // which keeps all three gaps equal at any Hc
             float x = MenuColumnWidth * 0.5f;
-            void Put(RectTransform rt, float anchorY, float offsetY, float height)
+            void Put(RectTransform rt, float anchorY, float offsetY, float height, float width = MenuColumnWidth, float centreX = -1f)
             {
                 rt.anchorMin = rt.anchorMax = new Vector2(0f, anchorY);
                 rt.pivot = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = new Vector2(x, offsetY);
-                rt.sizeDelta = new Vector2(MenuColumnWidth, height);
+                rt.anchoredPosition = new Vector2(centreX < 0f ? x : centreX, offsetY);
+                rt.sizeDelta = new Vector2(width, height);
             }
 
             Put(play, 1f, -PlayHeight * 0.5f, PlayHeight);
-            Put(exit, 0f, MenuButtonHeight * 0.5f, MenuButtonHeight);
+            Put(exit, 0f, MenuButtonHeight * 0.5f, MenuButtonHeight, MenuHalfWidth, MenuHalfWidth * 0.5f); // EXIT: the left half of the bottom row; NEW GAME takes the right half
+            Transform newGameButton = buttons.Find("NewGameButton");
+            if (newGameButton != null)
+            {
+                Put((RectTransform)newGameButton, 0f, MenuButtonHeight * 0.5f, MenuButtonHeight, MenuHalfWidth, MenuColumnWidth - MenuHalfWidth * 0.5f);
+            }
             // centre of SETTINGS from the bottom = 128 + g + 64 with g = (Hc - 560) / 3  ->  Hc / 3 + (192 - 560 / 3)
             Put(settings, 1f / 3f, MenuButtonHeight * 1.5f - buttonsHeight / 3f, MenuButtonHeight);
             // centre of CHARACTER from the bottom = 2 x 128 + 2g + 64  ->  2 Hc / 3 + (320 - 2 x 560 / 3)
             Put(character, 2f / 3f, MenuButtonHeight * 2.5f - 2f * buttonsHeight / 3f, MenuButtonHeight);
             Debug.Assert(Mathf.Approximately(columnHeight, 626f), "Main Menu column reference height changed: re-check the elastic layout");
+        }
+
+        // ================================================================ stage 18B: CONTINUE GAME / START ADVENTURE, the summary line and NEW GAME
+
+        /// <summary>The pieces the Main Menu controller drives: the big button's label and summary line, the NEW GAME button and the icon of EXIT.</summary>
+        public readonly struct ContinueControls
+        {
+            public ContinueControls(TMP_Text playLabel, TMP_Text summary, Button newGame)
+            {
+                PlayLabel = playLabel;
+                Summary = summary;
+                NewGame = newGame;
+            }
+
+            public TMP_Text PlayLabel { get; }
+            public TMP_Text Summary { get; }
+            public Button NewGame { get; }
+        }
+
+        /// <summary>
+        /// The big button gets a two line face: its label (START ADVENTURE / CONTINUE GAME, fitted) and, for a saved game, a small summary line (655 GOLD · 2 AREAS UNLOCKED). A NEW GAME button is added
+        /// beside EXIT (shown by the controller only for a saved game; it asks the safe question first). The elastic layout of the column is not touched: nothing here changes the column's height.
+        /// </summary>
+        private static ContinueControls AddContinueControls(Transform buttons, Button play, Button exit)
+        {
+            TMP_Text label = play.transform.Find("Label").GetComponent<TMP_Text>();
+            label.text = "START ADVENTURE";
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 40f;
+            label.fontSizeMax = 84f;
+            var labelRect = (RectTransform)label.transform;
+            labelRect.offsetMin = new Vector2(labelRect.offsetMin.x, 12f);
+
+            TextMeshProUGUI summary = BodyText(play.transform, "Summary", "0 GOLD \u00B7 1 AREA UNLOCKED", 32f, WoodDeepest, TextAlignmentOptions.Center, "UI_Body_Cream");
+            summary.enableAutoSizing = true;
+            summary.fontSizeMin = 20f;
+            summary.fontSizeMax = 32f;
+            var summaryRect = (RectTransform)summary.transform;
+            summaryRect.anchorMin = new Vector2(0f, 0f);
+            summaryRect.anchorMax = new Vector2(1f, 0f);
+            summaryRect.pivot = new Vector2(0.5f, 0f);
+            summaryRect.offsetMin = new Vector2(140f, 26f);
+            summaryRect.offsetMax = new Vector2(-20f, 66f);
+            summary.gameObject.SetActive(false);
+
+            Button newGame = TextButton(buttons, "NewGameButton", "NEW GAME", ButtonStyle.Wood, new Vector2(MenuHalfWidth, MenuButtonHeight), 46f);
+            TMP_Text newGameLabel = newGame.transform.Find("Label").GetComponent<TMP_Text>();
+            newGameLabel.enableAutoSizing = true;
+            newGameLabel.fontSizeMin = 26f;
+            newGameLabel.fontSizeMax = 46f;
+            var exitRect = (RectTransform)exit.transform;
+            var newGameRect = (RectTransform)newGame.transform;
+            newGameRect.anchorMin = exitRect.anchorMin;
+            newGameRect.anchorMax = exitRect.anchorMax;
+            newGameRect.pivot = exitRect.pivot;
+            newGameRect.sizeDelta = new Vector2(MenuHalfWidth, MenuButtonHeight);
+            newGameRect.anchoredPosition = new Vector2(MenuColumnWidth - MenuHalfWidth * 0.5f, exitRect.anchoredPosition.y);
+            Entrance(newGame.gameObject, UiEntrance.Style.SlideFromLeft, 0.2f, 0.3f, 320f);
+            newGame.gameObject.SetActive(false);
+
+            // EXIT is the left half of the bottom row now: its label shrinks to fit the room next to the icon
+            TMP_Text exitLabel = exit.transform.Find("Label").GetComponent<TMP_Text>();
+            exitLabel.enableAutoSizing = true;
+            exitLabel.fontSizeMin = 30f;
+            exitLabel.fontSizeMax = 54f;
+            return new ContinueControls(label, summary, newGame);
+        }
+
+        private static void WireContinueControls(MainMenuController controller, ContinueControls controls)
+        {
+            SetRef(controller, "playLabel", controls.PlayLabel);
+            SetRef(controller, "playSummary", controls.Summary);
+            SetRef(controller, "newGameButton", controls.NewGame);
+        }
+
+        /// <summary>Adds the stage 18B controls to the EXISTING MainMenuUI prefab in place (idempotent: an older NewGameButton / Summary is replaced). No other part of the menu is rebuilt.</summary>
+        public static string PatchMainMenuContinue()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(MainMenuPath);
+            try
+            {
+                Transform buttons = root.transform.Find("Buttons");
+                Transform play = buttons.Find("PlayButton");
+                Transform exit = buttons.Find("ExitButton");
+                Transform oldNewGame = buttons.Find("NewGameButton");
+                if (oldNewGame != null)
+                {
+                    Object.DestroyImmediate(oldNewGame.gameObject);
+                }
+
+                Transform oldSummary = play.Find("Summary");
+                if (oldSummary != null)
+                {
+                    Object.DestroyImmediate(oldSummary.gameObject);
+                }
+
+                ContinueControls controls = AddContinueControls(buttons, play.GetComponent<Button>(), exit.GetComponent<Button>());
+                WireContinueControls(root.GetComponent<MainMenuController>(), controls);
+                ApplyMainMenuElasticLayout((RectTransform)root.transform.Find("TitleRoot"), (RectTransform)buttons, (RectTransform)play, (RectTransform)buttons.Find("CharacterButton"), (RectTransform)buttons.Find("SettingsButton"), (RectTransform)exit);
+                PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
+                return "MainMenuUI: continue controls added";
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         /// <summary>Applies <see cref="ApplyMainMenuElasticLayout"/> to the EXISTING MainMenuUI prefab in place (no other part of the menu is rebuilt).</summary>
@@ -556,8 +679,50 @@ namespace ItemCollector3D.EditorTools
             so.FindProperty("selectLabel").objectReferenceValue = select.transform.Find("Label").GetComponent<TMP_Text>();
             so.FindProperty("selectedMark").objectReferenceValue = checkRect.gameObject;
             so.ApplyModifiedPropertiesWithoutUndo();
+            WireSelectedLook(controller, select);
             // "stage" is wired by the scene builder (it lives in the scene, not in the prefab)
             return panel;
+        }
+
+        /// <summary>
+        /// Stage 18B: the SELECT / SELECTED states of the miner screen. SELECT is the gold action button; once the miner on show is the saved one the button turns green, keeps its check mark and says
+        /// SELECTED, so the state does not rest on a small check mark alone.
+        /// </summary>
+        private static void WireSelectedLook(CharacterSelectController controller, Button select)
+        {
+            var so = new SerializedObject(controller);
+            so.FindProperty("selectFace").objectReferenceValue = select.transform.Find("Face").GetComponent<Image>();
+            so.FindProperty("selectSprite").objectReferenceValue = S(SpriteFor(ButtonStyle.Gold));
+            so.FindProperty("selectedSprite").objectReferenceValue = S(SpriteFor(ButtonStyle.Green));
+            so.FindProperty("selectLabelMaterial").objectReferenceValue = UiFonts.Load(TextMaterialFor(ButtonStyle.Gold));
+            so.FindProperty("selectedLabelMaterial").objectReferenceValue = UiFonts.Load(TextMaterialFor(ButtonStyle.Green));
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>Adds the SELECT / SELECTED look to the miner screen that already is in the Main Menu prefab (nothing else is rebuilt).</summary>
+        public static string PatchCharacterSelectedLook()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(MainMenuPath);
+            try
+            {
+                var controller = root.GetComponentInChildren<CharacterSelectController>(true);
+                Button select = null;
+                foreach (Button b in controller.GetComponentsInChildren<Button>(true))
+                {
+                    if (b.name == "SelectButton")
+                    {
+                        select = b;
+                    }
+                }
+
+                WireSelectedLook(controller, select);
+                PrefabUtility.SaveAsPrefabAsset(root, MainMenuPath);
+                return "CharacterPanel: SELECTED look wired";
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
     }
 }

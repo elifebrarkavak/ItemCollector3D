@@ -2,6 +2,7 @@
 using System.Collections;
 using ItemCollector3D.Characters;
 using ItemCollector3D.Menus;
+using ItemCollector3D.Progress;
 using ItemCollector3D.Player;
 using ItemCollector3D.Treasure;
 using NUnit.Framework;
@@ -33,6 +34,7 @@ namespace ItemCollector3D.Tests.PlayMode
         public IEnumerator SetUp()
         {
             GameSettings.ResetCurrent();
+            ProgressManager.StoreFactoryOverride = ProgressTestIsolation.SavedGame; // PLAY continues a saved game (a first launch would start the introduction, stage 18B)
             CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore(); // never touch the real PlayerPrefs
             CharacterSelection.ResetCurrent();
             previousBackground = InputSystem.settings.backgroundBehavior;
@@ -60,6 +62,7 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             loadedScene = default;
+            ProgressManager.StoreFactoryOverride = () => new MemoryProgressStore();
             GameSettings.StoreFactoryOverride = () => new MemorySettingsStore();
             GameSettings.ResetCurrent();
             CharacterSelection.StoreFactoryOverride = () => new MemoryCharacterStore();

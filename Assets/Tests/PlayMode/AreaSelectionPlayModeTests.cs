@@ -87,9 +87,14 @@ namespace ItemCollector3D.Tests.PlayMode
         private IEnumerator LoadMenu(int totalGold)
         {
             store = new MemoryProgressStore();
+            ProgressService seed = ProgressService.Create(catalog, store);
             if (totalGold > 0)
             {
-                ProgressService.Create(catalog, store).RegisterCollected("seed_treasure", totalGold);
+                seed.RegisterCollected("seed_treasure", totalGold);
+            }
+            else
+            {
+                seed.Save(); // a game in progress with 0 gold is a saved game too (not a first launch): PLAY continues it
             }
 
             ProgressManager.StoreFactoryOverride = () => store;
@@ -247,38 +252,59 @@ namespace ItemCollector3D.Tests.PlayMode
         {
             AreaCatalog areas = AssetDatabase.LoadAssetAtPath<AreaCatalog>(CatalogPath);
             ProgressService service = ProgressService.Create(areas, new MemoryProgressStore());
-            service.RegisterCollected("t", 120);
+            service.RegisterCollected("t", 120); // an unknown id: it pays its gold but is none of the 60 treasures
 
+            // every card says the same three things in the same order: STATUS, TREASURES (by id) and when it opens (in TOTAL gold). None of them is a per map gold number
             AreaCardState green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene);
-            Assert.That(green.GoldText, Is.EqualTo("GOAL: 500 GOLD"), "Green Mine shows its goal");
-            Assert.That(green.CaptionText, Is.EqualTo("120 / 500 COLLECTED"));
-            Assert.That(green.Progress01, Is.EqualTo(0.24f).Within(1e-4f));
+            Assert.That(green.StatusLine, Is.EqualTo("UNLOCKED"));
+            Assert.That(green.TreasureText, Is.EqualTo("TREASURES: 0 / 15"));
+            Assert.That(green.UnlockText, Is.EqualTo("OPEN FROM THE START"));
+            Assert.That(green.Progress01, Is.EqualTo(0f), "the bar is the share of treasures, not gold");
+            Assert.That(green.TotalGold, Is.EqualTo(120));
 
             AreaCardState rocky = AreaSelectController.Evaluate(service, "rocky_canyon", "");
             Assert.That(rocky.IsLocked, Is.True);
-            Assert.That(rocky.GoldText, Is.EqualTo("380 GOLD TO UNLOCK"), "a locked area shows the gold that is LEFT (500 - 120)");
-            Assert.That(rocky.CaptionText, Is.EqualTo("TOTAL GOLD: 120 / 500"));
-            Assert.That(rocky.RemainingGold, Is.EqualTo(380));
+            Assert.That(rocky.StatusLine, Is.EqualTo("LOCKED"));
+            Assert.That(rocky.TreasureText, Is.EqualTo("TREASURES: 0 / 20"));
+            Assert.That(rocky.UnlockText, Is.EqualTo("UNLOCKS AT 500 TOTAL GOLD"));
+            Assert.That(rocky.RemainingGold, Is.EqualTo(380), "500 - 120");
             Assert.That(rocky.StatusText, Is.EqualTo("LOCKED"));
 
             AreaCardState ancient = AreaSelectController.Evaluate(service, "ancient_mine", "");
-            Assert.That(ancient.GoldText, Is.EqualTo("1080 GOLD TO UNLOCK"));
-            Assert.That(ancient.CaptionText, Is.EqualTo("TOTAL GOLD: 120 / 1200"));
+            Assert.That(ancient.StatusLine, Is.EqualTo("LOCKED"));
+            Assert.That(ancient.TreasureText, Is.EqualTo("TREASURES: 0 / 25"));
+            Assert.That(ancient.UnlockText, Is.EqualTo("UNLOCKS AT 1200 TOTAL GOLD"));
+            Assert.That(ancient.RemainingGold, Is.EqualTo(1080));
 
-            service.RegisterCollected("u", 400); // 520 total: Green Mine complete, Rocky Canyon open
+            // two real treasures of Green Mine: the counts follow the ids; 520 total gold opens Rocky Canyon (no scene here: COMING SOON)
+            service.RegisterCollected("green_mine.camp_01", 100);
+            service.RegisterCollected("green_mine.forest_01", 300);
             green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene);
-            Assert.That(green.GoldText, Is.EqualTo("GOAL: 500 GOLD"));
-            Assert.That(green.CaptionText, Is.EqualTo("GOAL COMPLETE"), "never more than the goal is counted");
+            Assert.That(green.TreasureText, Is.EqualTo("TREASURES: 2 / 15"));
+            Assert.That(green.Progress01, Is.EqualTo(2f / 15f).Within(1e-4f));
+            Assert.That(green.Completed, Is.False, "2 of 15 treasures: not complete, whatever the gold is");
+            Assert.That(green.UnlockText, Is.EqualTo("OPEN FROM THE START"));
             rocky = AreaSelectController.Evaluate(service, "rocky_canyon", "");
             Assert.That(rocky.Availability, Is.EqualTo(AreaAvailability.ComingSoon));
             Assert.That(rocky.StatusText, Is.EqualTo("COMING SOON"));
-            Assert.That(rocky.GoldText, Is.EqualTo("GOAL: 1200 GOLD"), "an open area shows its goal");
-            Assert.That(rocky.CaptionText, Is.EqualTo("520 / 1200 COLLECTED"));
-            Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").GoldText, Is.EqualTo("680 GOLD TO UNLOCK"), "1200 - 520 left for Ancient Mine");
+            Assert.That(rocky.StatusLine, Is.EqualTo("UNLOCKED"));
+            Assert.That(rocky.UnlockText, Is.EqualTo("UNLOCKED AT 500 TOTAL GOLD"));
+            Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").RemainingGold, Is.EqualTo(680), "1200 - 520 left for Ancient Mine");
+
+            // all 15 treasures of Green Mine: now it is complete (by treasures)
+            foreach (string id in TreasureCatalog.IdsOf("green_mine"))
+            {
+                service.RegisterCollected(id, 0);
+            }
+
+            green = AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene);
+            Assert.That(green.TreasureText, Is.EqualTo("TREASURES: 15 / 15"));
+            Assert.That(green.Completed && green.ShowsCompleted, Is.True);
+            Assert.That(green.Progress01, Is.EqualTo(1f));
         }
 
         [Test]
-        public void GoalAndRemainingGold_AreComputedFromTheCatalogAndTheService_NotHardCoded()
+        public void UnlockThresholdAndRemainingGold_AreComputedFromTheCatalogAndTheService_NotHardCoded()
         {
             // a different catalog: the card text follows it
             AreaCatalog custom = AreaCatalog.CreateDefault();
@@ -291,9 +317,13 @@ namespace ItemCollector3D.Tests.PlayMode
             ProgressService service = ProgressService.Create(custom, new MemoryProgressStore());
             service.RegisterCollected("t", 120);
 
-            Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene).GoldText, Is.EqualTo("GOAL: 300 GOLD"));
-            Assert.That(AreaSelectController.Evaluate(service, "rocky_canyon", "").GoldText, Is.EqualTo("180 GOLD TO UNLOCK"), "300 - 120");
-            Assert.That(AreaSelectController.Evaluate(service, "ancient_mine", "").GoldText, Is.EqualTo("680 GOLD TO UNLOCK"), "800 - 120");
+            Assert.That(AreaSelectController.Evaluate(service, "green_mine", SceneNavigator.GreenMineScene).UnlockText, Is.EqualTo("OPEN FROM THE START"));
+            AreaCardState rocky300 = AreaSelectController.Evaluate(service, "rocky_canyon", "");
+            Assert.That(rocky300.UnlockText, Is.EqualTo("UNLOCKS AT 300 TOTAL GOLD"));
+            Assert.That(rocky300.RemainingGold, Is.EqualTo(180), "300 - 120");
+            AreaCardState ancient800 = AreaSelectController.Evaluate(service, "ancient_mine", "");
+            Assert.That(ancient800.UnlockText, Is.EqualTo("UNLOCKS AT 800 TOTAL GOLD"));
+            Assert.That(ancient800.RemainingGold, Is.EqualTo(680), "800 - 120");
 
             // the real catalog: what is left shrinks by exactly the gold collected, one by one, until the area opens
             AreaCatalog areas = AssetDatabase.LoadAssetAtPath<AreaCatalog>(CatalogPath);
@@ -307,14 +337,16 @@ namespace ItemCollector3D.Tests.PlayMode
                 AreaCardState rocky = AreaSelectController.Evaluate(real, "rocky_canyon", "");
                 Assert.That(real.TotalGold, Is.EqualTo(total));
                 Assert.That(rocky.RemainingGold, Is.EqualTo(500 - total), $"Rocky Canyon at {total}");
-                Assert.That(rocky.GoldText, Is.EqualTo(500 - total + " GOLD TO UNLOCK"));
+                Assert.That(rocky.UnlockText, Is.EqualTo("UNLOCKS AT 500 TOTAL GOLD"), "the threshold itself never changes");
                 Assert.That(AreaSelectController.Evaluate(real, "ancient_mine", "").RemainingGold, Is.EqualTo(1200 - total));
             }
 
-            Assert.That(AreaSelectController.Evaluate(real, "rocky_canyon", "").GoldText, Is.EqualTo("1 GOLD TO UNLOCK"));
+            Assert.That(AreaSelectController.Evaluate(real, "rocky_canyon", "").RemainingGold, Is.EqualTo(1));
             real.RegisterCollected("open", 1); // 500 total
-            Assert.That(AreaSelectController.Evaluate(real, "rocky_canyon", "").IsLocked, Is.False, "at 500 gold nothing is left to unlock");
-            Assert.That(AreaSelectController.Evaluate(real, "rocky_canyon", "").GoldText, Is.EqualTo("GOAL: 1200 GOLD"));
+            AreaCardState open = AreaSelectController.Evaluate(real, "rocky_canyon", "");
+            Assert.That(open.IsLocked, Is.False, "at 500 gold nothing is left to unlock");
+            Assert.That(open.StatusLine, Is.EqualTo("UNLOCKED"));
+            Assert.That(open.UnlockText, Is.EqualTo("UNLOCKED AT 500 TOTAL GOLD"));
         }
 
         // ------------------------------------------------------------------ the flow
@@ -443,10 +475,12 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(green.State.Availability, Is.EqualTo(AreaAvailability.Playable));
             Assert.That(green.LockVisible, Is.False);
             Assert.That(green.ComingSoonVisible, Is.False);
-            Assert.That(green.GoldLabel.text, Is.EqualTo("GOAL: 500 GOLD"));
-            Assert.That(green.CaptionLabel.text, Is.EqualTo("0 / 500 COLLECTED"));
+            Assert.That(green.StatusLabel.text, Is.EqualTo("UNLOCKED"));
+            Assert.That(green.TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 15"));
+            Assert.That(green.UnlockLabel.text, Is.EqualTo("OPEN FROM THE START"));
+            Assert.That(green.StatusCheckVisible && !green.StatusLockVisible, Is.True, "a check mark in front of UNLOCKED");
 
-            foreach ((AreaCardView card, string text, string caption) in new[] { (rocky, "500 GOLD TO UNLOCK", "TOTAL GOLD: 0 / 500"), (ancient, "1200 GOLD TO UNLOCK", "TOTAL GOLD: 0 / 1200") })
+            foreach ((AreaCardView card, string treasures, string unlock) in new[] { (rocky, "TREASURES: 0 / 20", "UNLOCKS AT 500 TOTAL GOLD"), (ancient, "TREASURES: 0 / 25", "UNLOCKS AT 1200 TOTAL GOLD") })
             {
                 Assert.That(card.State.Availability, Is.EqualTo(AreaAvailability.Locked), card.AreaId);
                 Assert.That(card.LockVisible, Is.True, card.AreaId + " shows its padlock");
@@ -454,8 +488,10 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(card.LockedButton.gameObject.activeSelf, Is.True);
                 Assert.That(card.PlayButton.gameObject.activeSelf, Is.False);
                 Assert.That(card.ComingSoonButton.gameObject.activeSelf, Is.False);
-                Assert.That(card.GoldLabel.text, Is.EqualTo(text), card.AreaId + " shows the gold it needs");
-                Assert.That(card.CaptionLabel.text, Is.EqualTo(caption));
+                Assert.That(card.StatusLabel.text, Is.EqualTo("LOCKED"), card.AreaId);
+                Assert.That(card.StatusLockVisible && !card.StatusCheckVisible, Is.True, card.AreaId + ": a padlock in front of LOCKED");
+                Assert.That(card.TreasuresLabel.text, Is.EqualTo(treasures), card.AreaId);
+                Assert.That(card.UnlockLabel.text, Is.EqualTo(unlock), card.AreaId + " says when it opens, in TOTAL gold");
                 Assert.That(card.LockedButton.GetComponentInChildren<TMP_Text>().text, Is.EqualTo("LOCKED"));
             }
 
@@ -484,8 +520,9 @@ namespace ItemCollector3D.Tests.PlayMode
             AreaSelectController screen = Find<AreaSelectController>("AreaPanel");
             AreaCardView rocky = Card(screen, "rocky_canyon");
             Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.Locked), "499 gold is not enough");
-            Assert.That(rocky.GoldLabel.text, Is.EqualTo("1 GOLD TO UNLOCK"), "one gold short");
-            Assert.That(rocky.CaptionLabel.text, Is.EqualTo("TOTAL GOLD: 499 / 500"));
+            Assert.That(rocky.UnlockLabel.text, Is.EqualTo("UNLOCKS AT 500 TOTAL GOLD"), "one gold short: still the same threshold");
+            Assert.That(rocky.State.RemainingGold, Is.EqualTo(1));
+            Assert.That(screen.TotalGoldLabel.text, Is.EqualTo("TOTAL GOLD: 499"), "the whole game's gold, said so, once");
             Assert.That(screen.TryEnter("rocky_canyon"), Is.EqualTo(AreaEnterResult.Locked));
 
             // the 500th gold is collected (in the gameplay scene), the player comes back to the menu: the screen shows it unlocked
@@ -513,7 +550,8 @@ namespace ItemCollector3D.Tests.PlayMode
             AreaCardView ancient = Card(screen, "ancient_mine");
             Assert.That(Card(screen, "rocky_canyon").State.Availability, Is.EqualTo(AreaAvailability.Playable));
             Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.Locked), "1199 gold is not enough");
-            Assert.That(ancient.GoldLabel.text, Is.EqualTo("1 GOLD TO UNLOCK"), "one gold short");
+            Assert.That(ancient.UnlockLabel.text, Is.EqualTo("UNLOCKS AT 1200 TOTAL GOLD"), "one gold short");
+            Assert.That(ancient.State.RemainingGold, Is.EqualTo(1));
             Assert.That(screen.TryEnter("ancient_mine"), Is.EqualTo(AreaEnterResult.Locked));
 
             Find<Button>("AreaBackButton").onClick.Invoke();
@@ -525,8 +563,9 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(ancient.ComingSoonVisible, Is.False, "COMING SOON is gone");
             Assert.That(ancient.LockVisible, Is.False);
             Assert.That(ancient.PlayButton.gameObject.activeSelf, Is.True, "it shows PLAY");
-            Assert.That(ancient.GoldLabel.text, Is.EqualTo("GOAL: 2500 GOLD"));
-            Assert.That(ancient.CaptionLabel.text, Is.EqualTo("1200 / 2500 COLLECTED"));
+            Assert.That(ancient.StatusLabel.text, Is.EqualTo("UNLOCKED"));
+            Assert.That(ancient.TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 25"));
+            Assert.That(ancient.UnlockLabel.text, Is.EqualTo("UNLOCKED AT 1200 TOTAL GOLD"));
 
             string requested = null;
             SceneNavigator.LoadHook = name => requested = name;
@@ -599,35 +638,36 @@ namespace ItemCollector3D.Tests.PlayMode
             int writes = store.WriteCount;
 
             AreaCardView green = Card(screen, "green_mine");
-            Assert.That(green.GoldLabel.text, Is.EqualTo("GOAL: 500 GOLD"));
-            Assert.That(green.CaptionLabel.text, Is.EqualTo("120 / 500 COLLECTED"));
-            Assert.That(Card(screen, "rocky_canyon").GoldLabel.text, Is.EqualTo("380 GOLD TO UNLOCK"));
-            Assert.That(green.TargetFill, Is.EqualTo(0.24f).Within(1e-4f));
-            yield return new WaitForSecondsRealtime(1.6f);
-            Assert.That(green.DisplayedFill, Is.EqualTo(0.24f).Within(0.01f), "the bar fills up to the progress");
-            Assert.That(Card(screen, "rocky_canyon").TargetFill, Is.EqualTo(0.24f).Within(1e-4f), "locked: progress towards the 500 gold unlock");
-            Assert.That(Card(screen, "ancient_mine").TargetFill, Is.EqualTo(0.1f).Within(1e-4f), "locked: progress towards the 1200 gold unlock");
+            Assert.That(screen.TotalGoldLabel.text, Is.EqualTo("TOTAL GOLD: 120"));
+            Assert.That(green.TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 15"), "the seeded gold has no treasure ids");
+            Assert.That(Card(screen, "rocky_canyon").UnlockLabel.text, Is.EqualTo("UNLOCKS AT 500 TOTAL GOLD"));
+            Assert.That(green.TargetFill, Is.EqualTo(0f), "the bar counts treasures, never gold");
 
-            // collect more gold, leave and open again
+            // collect two real treasures (and more gold), leave and open again
             Find<Button>("AreaBackButton").onClick.Invoke();
-            UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.RegisterCollected("more", 330); // 450 total
+            ProgressService live = UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service;
+            live.RegisterCollected("green_mine.camp_01", 30);
+            live.RegisterCollected("green_mine.forest_01", 300); // 450 total
             Find<Button>("PlayButton").onClick.Invoke();
             yield return null;
-            Assert.That(green.CaptionLabel.text, Is.EqualTo("450 / 500 COLLECTED"), "the numbers are re-read every time the screen opens");
-            Assert.That(Card(screen, "rocky_canyon").GoldLabel.text, Is.EqualTo("50 GOLD TO UNLOCK"));
-            Assert.That(green.TargetFill, Is.EqualTo(0.9f).Within(1e-4f));
+            Assert.That(green.TreasuresLabel.text, Is.EqualTo("TREASURES: 2 / 15"), "the numbers are re-read every time the screen opens");
+            Assert.That(screen.TotalGoldLabel.text, Is.EqualTo("TOTAL GOLD: 450"));
+            Assert.That(Card(screen, "rocky_canyon").State.RemainingGold, Is.EqualTo(50));
+            Assert.That(green.TargetFill, Is.EqualTo(2f / 15f).Within(1e-4f));
+            yield return new WaitForSecondsRealtime(1.6f);
+            Assert.That(green.DisplayedFill, Is.EqualTo(2f / 15f).Within(0.01f), "the bar fills up to the share of treasures");
 
             // opening and closing the screen wrote nothing to the save
             Find<Button>("AreaBackButton").onClick.Invoke();
             Find<Button>("PlayButton").onClick.Invoke();
             Find<Button>("AreaBackButton").onClick.Invoke();
-            Assert.That(store.WriteCount, Is.EqualTo(writes + 1), "only the one RegisterCollected wrote (opening / closing the screen is read-only)");
+            Assert.That(store.WriteCount, Is.EqualTo(writes + 2), "only the two RegisterCollected calls wrote (opening / closing the screen is read-only)");
             Assert.That(saved, Is.Not.EqualTo(store.Json));
             Assert.That(UnityEngine.Object.FindAnyObjectByType<ProgressManager>().Service.TotalGold, Is.EqualTo(450));
         }
 
         [UnityTest]
-        public IEnumerator SelectionFeedback_FocusedCardLiftsAndAClosedCardShakesOnTap()
+        public IEnumerator SelectionFeedback_FocusedCardIsOutlinedAtTheSameSize_AndAClosedCardShakesOnTap()
         {
             yield return OpenAreaSelection(0);
             AreaSelectController screen = Find<AreaSelectController>("AreaPanel");
@@ -638,7 +678,9 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(screen.FocusedIndex, Is.EqualTo(0), "the playable area is focused when the screen opens");
             Assert.That(green.IsFocused, Is.True);
             Assert.That(rocky.IsFocused, Is.False);
-            Assert.That(green.transform.localScale.x, Is.GreaterThan(rocky.transform.localScale.x), "the focused card is a little bigger");
+            Assert.That(green.transform.localScale.x, Is.EqualTo(rocky.transform.localScale.x).Within(0.001f), "stage 18B: all three cards keep one size");
+            Assert.That(green.RingVisible, Is.True, "the focused card is outlined (a shape, not only a colour)");
+            Assert.That(rocky.RingVisible, Is.False);
 
             rocky.OnPointerClick(new PointerEventData(EventSystem.current));
             Assert.That(rocky.IsDenyAnimationPlaying, Is.True, "tapping a locked card shakes it");

@@ -51,6 +51,31 @@ namespace ItemCollector3D.Progress
         /// <summary>Why the data was recovered (empty unless <see cref="LoadStatus"/> is Recovered).</summary>
         public string RecoveryNote { get; private set; } = string.Empty;
 
+        /// <summary>
+        /// True when a saved game exists: the save file was there when the service started (even with 0 gold: a game in progress is not a first launch), or this service has written one since
+        /// (NEW GAME, a collected treasure...). False only on a real first launch, when no save file existed at all. The Main Menu uses this to tell START ADVENTURE from CONTINUE GAME (stage 18B).
+        /// A save that had to be recovered counts as a saved game.
+        /// </summary>
+        public bool HasSave { get; private set; }
+
+        /// <summary>How many areas of the catalog are open at the moment (the first one always is).</summary>
+        public int UnlockedAreaCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (AreaEntry area in Catalog.Areas)
+                {
+                    if (unlocked.Contains(area.id))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
+
         public int TotalGold => data.totalGold;
 
         /// <summary>The Green Mine tutorial: Pending only after NEW GAME (and until it is finished or skipped); older saves read as NotOffered.</summary>
@@ -375,7 +400,13 @@ namespace ItemCollector3D.Progress
 
         public bool Save()
         {
-            return store.Write(JsonUtility.ToJson(data));
+            bool written = store.Write(JsonUtility.ToJson(data));
+            if (written)
+            {
+                HasSave = true;
+            }
+
+            return written;
         }
 
         /// <summary>Erases the saved progress (tools / tests / a future "new game"). Raises no area events.</summary>
@@ -383,6 +414,7 @@ namespace ItemCollector3D.Progress
         {
             store.Delete();
             ApplyData(NewData());
+            HasSave = false;
             Changed?.Invoke();
         }
 
@@ -415,6 +447,7 @@ namespace ItemCollector3D.Progress
             }
 
             ApplyData(fresh);
+            HasSave = true;
             Changed?.Invoke();
             return true;
         }
@@ -484,6 +517,7 @@ namespace ItemCollector3D.Progress
             }
 
             ApplyData(loaded ?? NewData());
+            HasSave = LoadStatus != ProgressLoadStatus.NewGame; // no file at all = a first launch; a file with 0 gold is a game in progress
 
             if (LoadStatus == ProgressLoadStatus.Recovered)
             {

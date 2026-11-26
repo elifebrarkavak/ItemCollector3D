@@ -274,7 +274,9 @@ namespace ItemCollector3D.Tests.PlayMode
                 Rect r = CanvasRect((RectTransform)controls[i].transform);
                 // PLAY breathes (idle pulse up to 2.5%), so allow that much difference
                 Assert.That(r.xMin, Is.EqualTo(play.xMin).Within(10f), controls[i].name + " is aligned with PLAY");
-                Assert.That(r.width, Is.EqualTo(play.width).Within(14f));
+                // stage 18B: EXIT is the left half of the bottom row (NEW GAME takes the other half when a game is saved), every other button keeps the column width
+                float expectedWidth = controls[i].name == "ExitButton" ? (play.width - 20f) * 0.5f : play.width;
+                Assert.That(r.width, Is.EqualTo(expectedWidth).Within(14f), controls[i].name + " has its share of the column");
                 Assert.That(r.height, Is.LessThan(play.height), "PLAY is the biggest button");
                 Assert.That(r.height, Is.EqualTo(CanvasRect((RectTransform)controls[1].transform).height).Within(1f), "the secondary buttons are equal");
             }

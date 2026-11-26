@@ -368,8 +368,9 @@ namespace ItemCollector3D.Tests.PlayMode
                 Assert.That(plate.center.x, Is.EqualTo(canvas.center.x).Within(1f));
                 Assert.That(select.center.x, Is.EqualTo(plate.center.x).Within(0.5f), "name plate and SELECT share one axis");
                 Assert.That(select.width, Is.EqualTo(plate.width).Within(0.5f));
-                Assert.That(CanvasRect(Find<TMP_Text>("Name").rectTransform).center.x, Is.EqualTo(plate.center.x).Within(0.5f));
-                Assert.That(CanvasRect(Find<TMP_Text>("Tagline").rectTransform).center.x, Is.EqualTo(plate.center.x).Within(0.5f));
+                // (inside the miner screen: the introduction's page 3 has labels called "Name" too)
+                Assert.That(CanvasRect((RectTransform)root.Find("NamePlate/Name")).center.x, Is.EqualTo(plate.center.x).Within(0.5f));
+                Assert.That(CanvasRect((RectTransform)root.Find("NamePlate/Tagline")).center.x, Is.EqualTo(plate.center.x).Within(0.5f));
                 Assert.That(Overlaps(plate, select), Is.False);
 
                 // BACK (labelled, top left) and the round arrows (left / right of the miner) cannot be confused

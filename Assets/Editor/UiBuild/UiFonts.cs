@@ -23,7 +23,7 @@ namespace ItemCollector3D.EditorTools
 
         // Printable ASCII plus a few typographic characters: baked into the asset so the UI never depends on runtime glyph generation.
         private const string BakedCharacters =
-            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u2019\u00D7\u2713";
+            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\u2019\u00D7\u2713\u00B7";
 
         /// <summary>
         /// The UI font: our OWN dynamic TMP font asset made from the Bangers .ttf (Assets/UI/Fonts) with all ASCII glyphs pre-baked.
@@ -130,6 +130,16 @@ namespace ItemCollector3D.EditorTools
 
         public static Material Load(string name) => AssetDatabase.LoadAssetAtPath<Material>($"{Folder}/{name}.mat");
 
+        /// <summary>Creates only the text material of the red NEW GAME button (stage 18B) and bakes the middle dot of the Main Menu summary into the body font; everything else stays as it is.</summary>
+        public static void EnsureStage18bAssets()
+        {
+            System.IO.Directory.CreateDirectory(Folder);
+            Create("UI_Text_Red", Font, Hex("#5A1812"), 0.22f, 0f, new Color(0f, 0f, 0f, 0.26f), 0.3f, -0.4f, 0.08f);
+            BodyFont.TryAddCharacters("\u00B7", out _);
+            EditorUtility.SetDirty(BodyFont);
+            AssetDatabase.SaveAssets();
+        }
+
         public static void BuildAll()
         {
             System.IO.Directory.CreateDirectory(Folder);
@@ -143,6 +153,7 @@ namespace ItemCollector3D.EditorTools
             Create("UI_Text_Green", font, GreenDark, 0.22f, 0f, new Color(0f, 0f, 0f, 0.22f), 0.3f, -0.4f, 0.08f);
             Create("UI_Text_Navy", font, Outline, 0.22f, 0f, new Color(0f, 0f, 0f, 0.26f), 0.3f, -0.4f, 0.08f);
             Create("UI_Text_Label", font, WoodDeepest, 0.20f, 0f, new Color(0f, 0f, 0f, 0.22f), 0.3f, -0.4f, 0.08f);
+            Create("UI_Text_Red", font, Hex("#5A1812"), 0.22f, 0f, new Color(0f, 0f, 0f, 0.26f), 0.3f, -0.4f, 0.08f);
 
             // body text: upright Liberation Sans, a little emboldened (face dilate) with a thin dark outline for contrast on wood
             TMP_FontAsset body = BodyFont;
