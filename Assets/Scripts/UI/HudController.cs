@@ -25,6 +25,11 @@ namespace ItemCollector3D.UI
         public event Action CollectRequested;
 
         public int CurrentGold => currentGold;
+
+        /// <summary>The DIG / COLLECT buttons' rects (the tutorial highlights them; null when the HUD has none).</summary>
+        public RectTransform DigButtonRect => digButton != null ? (RectTransform)digButton.transform : null;
+
+        public RectTransform CollectButtonRect => collectButton != null ? (RectTransform)collectButton.transform : null;
         public int MaximumGold => maximumGold;
 
         private void Awake()

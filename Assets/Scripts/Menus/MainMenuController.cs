@@ -26,6 +26,8 @@ namespace ItemCollector3D.Menus
         [SerializeField] private SettingsPanelController settingsPanel;
         [SerializeField] private CharacterSelectController characterPanel;
         [SerializeField] private AreaSelectController areaPanel;
+        [Tooltip("The three-page introduction shown right after a successful NEW GAME (stage 17A).")]
+        [SerializeField] private IntroSlidesController introPanel;
 
         /// <summary>Test hook: when set EXIT calls this instead of quitting the application.</summary>
         public static Action ExitHook;
@@ -33,6 +35,7 @@ namespace ItemCollector3D.Menus
         public bool IsSettingsOpen => settingsPanel != null && settingsPanel.IsOpen;
         public bool IsCharacterSelectOpen => characterPanel != null && characterPanel.IsOpen;
         public bool IsAreaSelectOpen => areaPanel != null && areaPanel.IsOpen;
+        public bool IsIntroOpen => introPanel != null && introPanel.IsOpen;
 
         private void Awake()
         {
@@ -60,6 +63,7 @@ namespace ItemCollector3D.Menus
             {
                 settingsPanel.NewGameAvailable = true; // the NEW GAME button lives in the Main Menu's Settings only
                 settingsPanel.Closed += ShowHome;
+                settingsPanel.NewGameStarted += ShowIntro;
                 settingsPanel.Hide();
             }
 
@@ -74,6 +78,20 @@ namespace ItemCollector3D.Menus
                 areaPanel.Closed += ShowHome;
                 areaPanel.Hide();
             }
+
+            if (introPanel != null)
+            {
+                introPanel.Finished += HandleIntroFinished;
+                introPanel.Hide();
+            }
+        }
+
+        private void Start()
+        {
+            if (SceneNavigator.ConsumeAreaSelectionRequest())
+            {
+                OpenAreaSelect(); // coming back from a finished level: straight to the Area Selection (BACK still leads to the Main Menu)
+            }
         }
 
         private void OnDestroy()
@@ -81,6 +99,12 @@ namespace ItemCollector3D.Menus
             if (settingsPanel != null)
             {
                 settingsPanel.Closed -= ShowHome;
+                settingsPanel.NewGameStarted -= ShowIntro;
+            }
+
+            if (introPanel != null)
+            {
+                introPanel.Finished -= HandleIntroFinished;
             }
 
             if (characterPanel != null)
@@ -99,7 +123,11 @@ namespace ItemCollector3D.Menus
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
-                if (IsSettingsOpen)
+                if (IsIntroOpen)
+                {
+                    CloseIntro(); // the Android Back key closes the introduction and returns to the Main Menu
+                }
+                else if (IsSettingsOpen)
                 {
                     settingsPanel.Close();
                 }
@@ -166,6 +194,46 @@ namespace ItemCollector3D.Menus
 #else
             Application.Quit();
 #endif
+        }
+
+        /// <summary>NEW GAME succeeded (the save is already fresh): the introduction comes first, on top of everything.</summary>
+        private void ShowIntro()
+        {
+            if (introPanel != null)
+            {
+                introPanel.Open();
+            }
+        }
+
+        /// <summary>
+        /// SKIP or LET'S PLAY: on to the existing Character Selection (the Settings panel and its "NEW GAME STARTED" note are closed). The reset already happened once, in the NEW GAME dialog:
+        /// nothing here touches the save, the settings or the miner.
+        /// </summary>
+        private void HandleIntroFinished(bool skipped)
+        {
+            introPanel.Hide();
+            if (settingsPanel != null)
+            {
+                settingsPanel.Hide();
+            }
+
+            OpenCharacterSelect();
+        }
+
+        /// <summary>The Android Back key during the introduction: close it and return to the Main Menu (no reset, nothing else changes).</summary>
+        public void CloseIntro()
+        {
+            if (introPanel != null)
+            {
+                introPanel.Hide();
+            }
+
+            if (settingsPanel != null)
+            {
+                settingsPanel.Hide();
+            }
+
+            ShowHome();
         }
 
         private void ShowHome()

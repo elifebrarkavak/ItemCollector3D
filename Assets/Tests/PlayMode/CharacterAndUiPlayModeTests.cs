@@ -187,12 +187,14 @@ namespace ItemCollector3D.Tests.PlayMode
             Assert.That(menu.IsCharacterSelectOpen, Is.True);
             Assert.That(buttons.gameObject.activeSelf, Is.False, "the menu buttons give way to the selection screen");
             Assert.That(stage.CurrentMode, Is.EqualTo(MenuCharacterStage.Mode.Select));
-            Assert.That(Find<TMP_Text>("Name").text, Is.EqualTo("BARNABY"));
+            // not Find<TMP_Text>("Name"): the intro slides (17A) hold three more labels called "Name", and FindObjectsOfTypeAll has no fixed order
+            TMP_Text characterName = screen.transform.Find("NamePlate/Name").GetComponent<TMP_Text>();
+            Assert.That(characterName.text, Is.EqualTo("BARNABY"));
 
             Find<Button>("RightArrow").onClick.Invoke();
             Assert.That(screen.ViewingId, Is.EqualTo(CharacterSelection.FemaleId));
             Assert.That(stage.ShownIndex, Is.EqualTo(1));
-            Assert.That(Find<TMP_Text>("Name").text, Is.EqualTo("RUBY"));
+            Assert.That(characterName.text, Is.EqualTo("RUBY"));
             Find<Button>("RightArrow").onClick.Invoke(); // wraps around
             Assert.That(screen.ViewingId, Is.EqualTo(CharacterSelection.MaleId));
             Find<Button>("LeftArrow").onClick.Invoke(); // and back the other way

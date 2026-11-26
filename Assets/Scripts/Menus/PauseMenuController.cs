@@ -57,6 +57,17 @@ namespace ItemCollector3D.Menus
             }
         }
 
+        private void OnEnable()
+        {
+            GamePause.ModalChanged += HandleModalChanged;
+            HandleModalChanged(GamePause.ModalOpen);
+        }
+
+        private void OnDisable()
+        {
+            GamePause.ModalChanged -= HandleModalChanged;
+        }
+
         private void OnDestroy()
         {
             if (settingsPanel != null)
@@ -67,8 +78,24 @@ namespace ItemCollector3D.Menus
             GamePause.Resume(); // never leave the next scene frozen
         }
 
+        /// <summary>A modal panel (LEVEL COMPLETE) owns the screen: no PAUSE button underneath it; it comes back when the panel is closed.</summary>
+        private void HandleModalChanged(bool open)
+        {
+            if (pauseButton == null)
+            {
+                return;
+            }
+
+            pauseButton.gameObject.SetActive(!open && !IsPaused); // the panel resumes the game BEFORE it reports that it closed
+        }
+
         private void Update()
         {
+            if (GamePause.ModalOpen)
+            {
+                return; // the Android Back key belongs to the modal panel
+            }
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {

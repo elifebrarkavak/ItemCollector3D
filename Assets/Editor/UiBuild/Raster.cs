@@ -211,5 +211,10 @@ namespace ItemCollector3D.EditorTools
         {
             return (x, y) => Color.Lerp(topColor, bottomColor, Mathf.Clamp01((y - top) / Mathf.Max(1e-4f, bottom - top)));
         }
+
+        public static ColorFn HorizontalGradient(float left, float right, Color leftColor, Color rightColor)
+        {
+            return (x, y) => Color.Lerp(leftColor, rightColor, Mathf.Clamp01((x - left) / Mathf.Max(1e-4f, right - left)));
+        }
     }
 }

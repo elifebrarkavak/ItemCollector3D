@@ -39,6 +39,10 @@ namespace ItemCollector3D.Progress
         private readonly HashSet<string> collected = new();
         private readonly HashSet<string> unlocked = new();
         private readonly HashSet<string> completed = new();
+        private readonly HashSet<string> celebrated = new();
+        private readonly HashSet<string> pendingCelebration = new();
+        private readonly HashSet<string> pendingAchievements = new();
+        private readonly HashSet<string> celebratedAchievements = new();
         private GameProgressData data;
 
         public AreaCatalog Catalog { get; }
@@ -48,9 +52,16 @@ namespace ItemCollector3D.Progress
         public string RecoveryNote { get; private set; } = string.Empty;
 
         public int TotalGold => data.totalGold;
+
+        /// <summary>The Green Mine tutorial: Pending only after NEW GAME (and until it is finished or skipped); older saves read as NotOffered.</summary>
+        public TutorialStatus Tutorial => (TutorialStatus)Mathf.Clamp(data.tutorialState, 0, (int)TutorialStatus.Finished);
         public IReadOnlyList<string> CollectedTreasureIds => data.collectedTreasureIds;
         public IReadOnlyList<string> UnlockedAreaIds => data.unlockedAreaIds;
         public IReadOnlyList<string> CompletedAreaIds => data.completedAreaIds;
+        public IReadOnlyList<string> CelebratedAreaIds => data.celebratedAreaIds;
+        public IReadOnlyList<string> PendingCelebrationAreaIds => data.pendingCelebrationAreaIds;
+        public IReadOnlyList<string> PendingAchievementIds => data.pendingAchievementIds;
+        public IReadOnlyList<string> CelebratedAchievementIds => data.celebratedAchievementIds;
 
         /// <summary>Raised ONCE per area when its goal is reached (never again, not even after a reload).</summary>
         public event Action<string> AreaCompleted;
@@ -101,6 +112,133 @@ namespace ItemCollector3D.Progress
             return areaId != null && completed.Contains(areaId);
         }
 
+        /// <summary>
+        /// True once the LEVEL COMPLETE celebration (every treasure of the area collected, stage 17C) was shown for this area. This is NOT <see cref="IsAreaCompleted"/>: that one is the cumulative
+        /// gold goal (e.g. 500 gold in Green Mine) and can be true long before the last treasure is found.
+        /// </summary>
+        public bool IsCompletionCelebrated(string areaId)
+        {
+            return areaId != null && celebrated.Contains(areaId);
+        }
+
+        /// <summary>True while the last treasure of the area was collected but the player has not answered its LEVEL COMPLETE celebration yet (it is shown the next time the area is entered).</summary>
+        public bool IsCompletionPending(string areaId)
+        {
+            return areaId != null && pendingCelebration.Contains(areaId);
+        }
+
+        // ------------------------------------------------------------------ final achievements (stage 17D)
+
+        /// <summary>
+        /// How many of the 60 treasures of the three maps are in the save. Counted against <see cref="TreasureCatalog"/> by id: unknown ids (the sandbox coin), blanks and duplicates never count, and gold is not looked at.
+        /// </summary>
+        public int CollectedTreasureCount => CountCollected(TreasureCatalog.AllIds);
+
+        /// <summary>How many treasures of one area (an AreaCatalog id) are in the save, counted against <see cref="TreasureCatalog"/>.</summary>
+        public int CollectedTreasureCountIn(string areaId)
+        {
+            return CountCollected(TreasureCatalog.IdsOf(areaId));
+        }
+
+        /// <summary>True once every one of the 60 treasures is in the save.</summary>
+        public bool IsCollectionComplete => CollectedTreasureCount >= TreasureCatalog.TotalCount;
+
+        /// <summary>True once the cumulative total gold is at least <see cref="FinalAchievements.Goal"/> (gold above it is kept: nothing is capped at 2500).</summary>
+        public bool IsGameCompleteReached => data.totalGold >= FinalAchievements.Goal;
+
+        /// <summary>"Is the goal reached?": a fact of the saved gold / treasures, independent of any celebration.</summary>
+        public bool IsAchievementReached(string achievementId)
+        {
+            return achievementId switch
+            {
+                FinalAchievements.GameComplete => IsGameCompleteReached,
+                FinalAchievements.Collection => IsCollectionComplete,
+                _ => false,
+            };
+        }
+
+        /// <summary>"Is the celebration waiting to be shown?": the goal was crossed by a COLLECT and the player has not answered the panel yet.</summary>
+        public bool IsAchievementPending(string achievementId)
+        {
+            return achievementId != null && pendingAchievements.Contains(achievementId);
+        }
+
+        /// <summary>"Was the celebration already shown and answered?" (until the next NEW GAME).</summary>
+        public bool IsAchievementCelebrated(string achievementId)
+        {
+            return achievementId != null && celebratedAchievements.Contains(achievementId);
+        }
+
+        /// <summary>The next owed final celebration in the order GAME COMPLETE, then 100% COLLECTION, or null when none is owed.</summary>
+        public string NextPendingAchievement()
+        {
+            foreach (string id in FinalAchievements.Order)
+            {
+                if (pendingAchievements.Contains(id))
+                {
+                    return id;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Records that the player answered the celebration of a final achievement (and clears its pending mark in the same save), so it never opens again until NEW GAME. Saves, raises no events and changes no
+        /// gold, treasure, unlock or area-celebration data. Refused for an unknown achievement or one whose goal is not reached; marking twice is fine.
+        /// </summary>
+        /// <returns>true if the achievement is recorded as celebrated (and the save succeeded when something changed).</returns>
+        public bool MarkAchievementCelebrated(string achievementId)
+        {
+            if (!FinalAchievements.IsKnown(achievementId) || !IsAchievementReached(achievementId))
+            {
+                return false;
+            }
+
+            bool wasPending = pendingAchievements.Remove(achievementId);
+            if (wasPending)
+            {
+                data.pendingAchievementIds.Remove(achievementId);
+            }
+
+            if (!celebratedAchievements.Add(achievementId))
+            {
+                return !wasPending || Save();
+            }
+
+            data.celebratedAchievementIds.Add(achievementId);
+            return Save();
+        }
+
+        /// <summary>A COLLECT just crossed a goal: its celebration is owed. Only the first crossing counts (never for an achievement that is already owed or answered). Written by the caller's save.</summary>
+        private void OweAchievement(string achievementId)
+        {
+            if (celebratedAchievements.Contains(achievementId) || !pendingAchievements.Add(achievementId))
+            {
+                return;
+            }
+
+            data.pendingAchievementIds.Add(achievementId);
+        }
+
+        /// <summary>How many of the given treasure ids were collected (by id, so it never depends on gold). Blank ids are ignored.</summary>
+        public int CountCollected(IEnumerable<string> treasureIds)
+        {
+            int count = 0;
+            if (treasureIds != null)
+            {
+                foreach (string id in treasureIds)
+                {
+                    if (IsCollected(id))
+                    {
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
         /// <summary>Cumulative total gold that completes the area, or -1 for an unknown area.</summary>
         public int GetGoal(string areaId)
         {
@@ -136,11 +274,27 @@ namespace ItemCollector3D.Progress
                 return RegisterResult.AlreadyCollected;
             }
 
+            bool goalWasReached = IsGameCompleteReached;
+            bool collectionWasComplete = IsCollectionComplete;
+
             collected.Add(id);
             data.collectedTreasureIds.Add(id);
             data.totalGold = (int)Math.Min((long)data.totalGold + gold, MaxTotalGold);
 
             List<(string areaId, bool isUnlock)> raised = EvaluateThresholds();
+
+            // Stage 17D: crossing 2500 gold, or the 60th treasure, owes the final celebration. It is written in the SAME save as the gold and the treasure id, so a crash or a quit right after the COLLECT cannot
+            // lose it. Only the crossing counts: a save that was already past a goal before this version never celebrates it, and gold above the goal is kept as it is.
+            if (!goalWasReached && IsGameCompleteReached)
+            {
+                OweAchievement(FinalAchievements.GameComplete);
+            }
+
+            if (!collectionWasComplete && IsCollectionComplete)
+            {
+                OweAchievement(FinalAchievements.Collection);
+            }
+
             Save();
             Changed?.Invoke();
 
@@ -157,6 +311,66 @@ namespace ItemCollector3D.Progress
             }
 
             return RegisterResult.Accepted;
+        }
+
+        /// <summary>Records the tutorial state and saves (nothing else changes; no events). Returns whether the save succeeded.</summary>
+        public bool SetTutorial(TutorialStatus status)
+        {
+            if (Tutorial == status && data.tutorialState == (int)status)
+            {
+                return true;
+            }
+
+            data.tutorialState = (int)status;
+            return Save();
+        }
+
+        /// <summary>
+        /// The last treasure of an area was collected: its LEVEL COMPLETE celebration is now owed to the player and stays owed (in the save) until <see cref="MarkCompletionCelebrated"/>. Saves, raises no events and
+        /// changes no gold, treasure or unlock data. Refused for an unknown or already celebrated area; marking twice is harmless.
+        /// </summary>
+        /// <returns>true if the celebration is recorded as pending (and the save succeeded when something changed).</returns>
+        public bool MarkCompletionPending(string areaId)
+        {
+            if (string.IsNullOrWhiteSpace(areaId) || Catalog.Get(areaId) == null || celebrated.Contains(areaId))
+            {
+                return false;
+            }
+
+            if (!pendingCelebration.Add(areaId))
+            {
+                return true;
+            }
+
+            data.pendingCelebrationAreaIds.Add(areaId);
+            return Save();
+        }
+
+        /// <summary>
+        /// Records that the player answered the LEVEL COMPLETE celebration of an area (and clears its pending mark in the same save), so it never opens again until the next NEW GAME. Saves, raises no events and
+        /// changes no gold, treasure or unlock data. Unknown areas are refused; marking twice is fine.
+        /// </summary>
+        /// <returns>true if the area is recorded as celebrated (and the save succeeded when something changed).</returns>
+        public bool MarkCompletionCelebrated(string areaId)
+        {
+            if (string.IsNullOrWhiteSpace(areaId) || Catalog.Get(areaId) == null)
+            {
+                return false;
+            }
+
+            bool wasPending = pendingCelebration.Remove(areaId);
+            if (wasPending)
+            {
+                data.pendingCelebrationAreaIds.Remove(areaId);
+            }
+
+            if (!celebrated.Add(areaId))
+            {
+                return !wasPending || Save();
+            }
+
+            data.celebratedAreaIds.Add(areaId);
+            return Save();
         }
 
         public bool Save()
@@ -182,6 +396,7 @@ namespace ItemCollector3D.Progress
         public bool StartNewGame()
         {
             GameProgressData fresh = NewData();
+            fresh.tutorialState = (int)TutorialStatus.Pending; // a new game gets the Green Mine tutorial (stage 17B)
             bool written;
             try
             {
@@ -289,6 +504,10 @@ namespace ItemCollector3D.Progress
             collected.Clear();
             unlocked.Clear();
             completed.Clear();
+            celebrated.Clear();
+            pendingCelebration.Clear();
+            pendingAchievements.Clear();
+            celebratedAchievements.Clear();
             foreach (string id in data.collectedTreasureIds)
             {
                 collected.Add(id);
@@ -303,6 +522,28 @@ namespace ItemCollector3D.Progress
             {
                 completed.Add(id);
             }
+
+            foreach (string id in data.celebratedAreaIds)
+            {
+                celebrated.Add(id);
+            }
+
+            foreach (string id in data.pendingCelebrationAreaIds)
+            {
+                pendingCelebration.Add(id);
+            }
+
+            data.pendingAchievementIds ??= new List<string>();
+            data.celebratedAchievementIds ??= new List<string>();
+            foreach (string id in data.pendingAchievementIds)
+            {
+                pendingAchievements.Add(id);
+            }
+
+            foreach (string id in data.celebratedAchievementIds)
+            {
+                celebratedAchievements.Add(id);
+            }
         }
 
         /// <summary>Makes loaded data safe and consistent. Returns a description of what was repaired, or null if nothing was.</summary>
@@ -310,9 +551,36 @@ namespace ItemCollector3D.Progress
         {
             var notes = new List<string>();
 
+            d.tutorialState = Mathf.Clamp(d.tutorialState, 0, (int)TutorialStatus.Finished);
             d.collectedTreasureIds ??= new List<string>();
             d.unlockedAreaIds ??= new List<string>();
             d.completedAreaIds ??= new List<string>();
+
+            // Celebration flags (17C): a save from before it has none. Tidied silently (no "repair": an old save must load exactly as it was and is never rewritten just for this).
+            var cleanCelebrated = new List<string>();
+            foreach (string raw in d.celebratedAreaIds ?? new List<string>())
+            {
+                string id = raw?.Trim();
+                if (!string.IsNullOrEmpty(id) && Catalog.Get(id) != null && !cleanCelebrated.Contains(id))
+                {
+                    cleanCelebrated.Add(id);
+                }
+            }
+
+            d.celebratedAreaIds = cleanCelebrated;
+
+            // Pending celebrations (a save from before has none): known areas only, once each, and never for an area that was already celebrated. Also tidied silently.
+            var cleanPending = new List<string>();
+            foreach (string raw in d.pendingCelebrationAreaIds ?? new List<string>())
+            {
+                string id = raw?.Trim();
+                if (!string.IsNullOrEmpty(id) && Catalog.Get(id) != null && !cleanCelebrated.Contains(id) && !cleanPending.Contains(id))
+                {
+                    cleanPending.Add(id);
+                }
+            }
+
+            d.pendingCelebrationAreaIds = cleanPending;
 
             if (d.totalGold < 0 || d.totalGold > MaxTotalGold)
             {
@@ -340,6 +608,8 @@ namespace ItemCollector3D.Progress
 
             d.collectedTreasureIds = cleanIds;
 
+            TidyAchievements(d);
+
             // Area flags follow from the (cumulative, never decreasing) gold: repair anything that disagrees.
             var expectedUnlocked = new List<string>();
             var expectedCompleted = new List<string>();
@@ -365,6 +635,49 @@ namespace ItemCollector3D.Progress
             d.completedAreaIds = expectedCompleted;
 
             return notes.Count == 0 ? null : string.Join("; ", notes);
+        }
+
+        /// <summary>
+        /// Final achievement flags (17D; a save from before has none): known ids only, once each. A celebration can only be owed while its goal is reached and it was not answered yet (an owed record for a goal
+        /// that is not reached, or for an answered one, is dropped). Tidied silently, like the area flags of 17C: an old save is never "repaired" or rewritten for this and nothing is ever added here by loading.
+        /// </summary>
+        private static void TidyAchievements(GameProgressData d)
+        {
+            var celebratedIds = new List<string>();
+            foreach (string raw in d.celebratedAchievementIds ?? new List<string>())
+            {
+                string id = raw?.Trim();
+                if (FinalAchievements.IsKnown(id) && !celebratedIds.Contains(id))
+                {
+                    celebratedIds.Add(id);
+                }
+            }
+
+            d.celebratedAchievementIds = celebratedIds;
+
+            int collectedKnown = 0;
+            var seenKnown = new HashSet<string>();
+            foreach (string id in d.collectedTreasureIds)
+            {
+                if (TreasureCatalog.IsKnown(id) && seenKnown.Add(id))
+                {
+                    collectedKnown++;
+                }
+            }
+
+            var pendingIds = new List<string>();
+            foreach (string raw in d.pendingAchievementIds ?? new List<string>())
+            {
+                string id = raw?.Trim();
+                bool reached = id == FinalAchievements.GameComplete ? d.totalGold >= FinalAchievements.Goal
+                    : id == FinalAchievements.Collection && collectedKnown >= TreasureCatalog.TotalCount;
+                if (FinalAchievements.IsKnown(id) && reached && !celebratedIds.Contains(id) && !pendingIds.Contains(id))
+                {
+                    pendingIds.Add(id);
+                }
+            }
+
+            d.pendingAchievementIds = pendingIds;
         }
 
         private static bool SameSet(List<string> a, List<string> b)
