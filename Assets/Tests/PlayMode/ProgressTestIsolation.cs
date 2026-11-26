@@ -16,6 +16,20 @@ namespace ItemCollector3D.Tests.PlayMode
         /// <summary>Progress warnings captured during the tests (instead of being printed to the Console).</summary>
         public static readonly List<string> Warnings = new();
 
+        /// <summary>
+        /// An in-memory store that already holds a saved game (0 gold, only Green Mine open). Since stage 18B the Main Menu tells a real first launch (no save at all: START ADVENTURE, introduction, tutorial)
+        /// from a game in progress (CONTINUE GAME), so menu tests that press PLAY to reach the Area Selection need a save to continue.
+        /// </summary>
+        public static MemoryProgressStore SavedGameStore()
+        {
+            var store = new MemoryProgressStore();
+            ProgressService.Create(null, store).Save();
+            return store;
+        }
+
+        /// <summary>Factory form of <see cref="SavedGameStore"/> for <c>ProgressManager.StoreFactoryOverride</c>.</summary>
+        public static IProgressStore SavedGame() => SavedGameStore();
+
         [OneTimeSetUp]
         public void UseInMemoryProgressStore()
         {

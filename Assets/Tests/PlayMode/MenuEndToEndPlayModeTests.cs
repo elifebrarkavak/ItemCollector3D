@@ -48,13 +48,25 @@ namespace ItemCollector3D.Tests.PlayMode
 
         private static T Find<T>(string name) where T : Component
         {
+            // Several controls share a name across the panels of one scene (the Pause Menu and the final celebration panel both have a MainMenuButton): the one the player can reach is the active one
             Scene active = SceneManager.GetActiveScene();
+            T inactive = null;
             foreach (T item in Resources.FindObjectsOfTypeAll<T>())
             {
                 if (item.name == name && item.gameObject.scene == active)
                 {
-                    return item;
+                    if (item.gameObject.activeInHierarchy)
+                    {
+                        return item;
+                    }
+
+                    inactive ??= item;
                 }
+            }
+
+            if (inactive != null)
+            {
+                return inactive;
             }
 
             Assert.Fail($"{typeof(T).Name} '{name}' not found in {active.name}");
@@ -101,7 +113,7 @@ namespace ItemCollector3D.Tests.PlayMode
         [UnityTest]
         public IEnumerator Flow_MainMenu_Play_Gameplay_Pause_Settings_Resume_MainMenu_RealSceneLoads()
         {
-            var progressStore = new MemoryProgressStore();
+            MemoryProgressStore progressStore = ProgressTestIsolation.SavedGameStore(); // a game in progress: PLAY continues it
             var settingsStore = new MemorySettingsStore();
             ProgressManager.StoreFactoryOverride = () => progressStore; // survives "restarting" the scenes
             GameSettings.StoreFactoryOverride = () => settingsStore;
@@ -175,7 +187,7 @@ namespace ItemCollector3D.Tests.PlayMode
             // ---- PLAY again: the collected coin is still collected, gold is still 10 (and the Area Selection shows it: 10 / 500)
             Find<Button>("PlayButton").onClick.Invoke();
             yield return null;
-            Assert.That(Find<AreaSelectController>("AreaPanel").GetCard(0).CaptionLabel.text, Is.EqualTo("10 / 500 COLLECTED"), "the Area Selection shows the saved progress");
+            Assert.That(Find<AreaSelectController>("AreaPanel").GetCard(0).TreasuresLabel.text, Is.EqualTo("TREASURES: 1 / 15"), "the Area Selection shows the saved progress");
             Find<Button>("AreaPlay_green_mine").onClick.Invoke();
             yield return WaitForScene(SceneNavigator.GreenMineScene);
             Assert.That(FindSpot("green_mine.meadow_01").State, Is.EqualTo(TreasureState.Collected), "Progress survived the menu round trip.");

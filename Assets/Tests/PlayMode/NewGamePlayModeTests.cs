@@ -49,6 +49,7 @@ namespace ItemCollector3D.Tests.PlayMode
         private AreaCatalog catalog;
         private Mouse mouse;
         private InputSettings.EditorInputBehaviorInPlayMode previousBehaviour;
+        private InputSettings.BackgroundBehavior previousBackground;
 
         // ------------------------------------------------------------------ the real save must not move
 
@@ -89,6 +90,8 @@ namespace ItemCollector3D.Tests.PlayMode
             SafeAreaFitter.SafeAreaOverride = () => new Rect(0f, 0f, Screen.width, Screen.height);
             previousBehaviour = InputSystem.settings.editorInputBehaviorInPlayMode;
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            previousBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus; // stage 18C: the UI input module drops pointer events while the Editor is unfocused (test run only, restored below)
             mouse = InputSystem.AddDevice<Mouse>("IC3D_TestMouseNewGame");
             yield return null;
         }
@@ -103,6 +106,7 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             InputSystem.settings.editorInputBehaviorInPlayMode = previousBehaviour;
+            InputSystem.settings.backgroundBehavior = previousBackground;
             SafeAreaFitter.SafeAreaOverride = null;
             PlayerPrefs.DeleteKey(SentinelKey); // only the key this test added
             GamePause.Resume();
@@ -417,12 +421,12 @@ namespace ItemCollector3D.Tests.PlayMode
             AreaSelectController areas = Find<AreaSelectController>("AreaPanel");
             AreaCardView green = Card(areas, "green_mine"), rocky = Card(areas, "rocky_canyon"), ancient = Card(areas, "ancient_mine");
             Assert.That(green.State.Availability, Is.EqualTo(AreaAvailability.Playable));
-            Assert.That(green.CaptionLabel.text, Is.EqualTo("0 / 500 COLLECTED"));
+            Assert.That(green.TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 15"));
             Assert.That(green.CompleteVisible, Is.False);
             Assert.That(rocky.State.Availability, Is.EqualTo(AreaAvailability.Locked));
-            Assert.That(rocky.GoldLabel.text, Is.EqualTo("500 GOLD TO UNLOCK"));
+            Assert.That(rocky.UnlockLabel.text, Is.EqualTo("UNLOCKS AT 500 TOTAL GOLD"));
             Assert.That(ancient.State.Availability, Is.EqualTo(AreaAvailability.Locked));
-            Assert.That(ancient.GoldLabel.text, Is.EqualTo("1200 GOLD TO UNLOCK"));
+            Assert.That(ancient.UnlockLabel.text, Is.EqualTo("UNLOCKS AT 1200 TOTAL GOLD"));
         }
 
         [UnityTest]
@@ -445,7 +449,7 @@ namespace ItemCollector3D.Tests.PlayMode
             Find<Button>("PlayButton").onClick.Invoke();
             yield return null;
             AreaSelectController areas = Find<AreaSelectController>("AreaPanel");
-            Assert.That(Card(areas, "green_mine").CaptionLabel.text, Is.EqualTo("0 / 500 COLLECTED"));
+            Assert.That(Card(areas, "green_mine").TreasuresLabel.text, Is.EqualTo("TREASURES: 0 / 15"));
             Assert.That(Card(areas, "rocky_canyon").State.Availability, Is.EqualTo(AreaAvailability.Locked));
             Assert.That(Card(areas, "ancient_mine").State.Availability, Is.EqualTo(AreaAvailability.Locked));
             yield return UnloadScene();

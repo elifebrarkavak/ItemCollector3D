@@ -117,8 +117,25 @@ namespace ItemCollector3D.EditorTools
             fitSo.FindProperty("topInset").floatValue = RowTop;
             fitSo.FindProperty("bottomMargin").floatValue = 12f;
             fitSo.FindProperty("sideMargin").floatValue = 30f;
+            fitSo.FindProperty("centreVertically").boolValue = true; // 4:3: the row sits in the middle of the free height instead of hugging the top
             fitSo.FindProperty("minScale").floatValue = MenuUiBuilder.TouchUnits / ButtonHeight; // never shrink the buttons below 48 dp
             fitSo.ApplyModifiedPropertiesWithoutUndo();
+
+            // the player's total gold, once for the whole screen and labelled as the whole game's gold (the cards never show a per map gold number)
+            RectTransform goldChip = Rect("TotalGoldChip", panel);
+            Place(goldChip, new Vector2(1f, 1f), new Vector2(-28f, -36f), new Vector2(380f, 104f));
+            Shadow(goldChip, goldChip.sizeDelta, new Vector2(0f, -8f), 0.4f, 20f);
+            Image goldChipBg = Img(goldChip, "Bg", S("ui_plate"), Color.white);
+            Stretch(goldChipBg.rectTransform);
+            Image goldChipGem = Img(goldChip, "Gem", S("icon_gem"), Color.white, false);
+            Place(goldChipGem.rectTransform, new Vector2(0f, 0.5f), new Vector2(30f, 2f), new Vector2(64f, 64f));
+            TextMeshProUGUI totalGold = Text(goldChip, "TotalGold", AreaSelectController.TotalGoldText(0), 46f, "UI_Title_Gold", GoldLight);
+            Stretch(totalGold.rectTransform, 104f, 6f, 16f, 0f);
+            totalGold.verticalAlignment = VerticalAlignmentOptions.Middle;
+            totalGold.enableAutoSizing = true;
+            totalGold.fontSizeMin = 26f;
+            totalGold.fontSizeMax = 46f;
+            Entrance(goldChip.gameObject, UiEntrance.Style.SlideFromRight, 0.04f, 0.28f, 140f);
 
             var views = new AreaCardView[Cards.Length];
             for (int i = 0; i < Cards.Length; i++)
@@ -134,6 +151,7 @@ namespace ItemCollector3D.EditorTools
             so.FindProperty("catalog").objectReferenceValue = catalog;
             so.FindProperty("progress").objectReferenceValue = progress;
             so.FindProperty("backButton").objectReferenceValue = back;
+            so.FindProperty("totalGoldLabel").objectReferenceValue = totalGold;
             SerializedProperty array = so.FindProperty("cards");
             array.arraySize = views.Length;
             for (int i = 0; i < views.Length; i++)
@@ -159,6 +177,9 @@ namespace ItemCollector3D.EditorTools
             Stretch(glow.rectTransform, -190f, -170f, -190f, -170f);
 
             Shadow(card, size, new Vector2(0f, -16f), 0.46f, 46f);
+            // the gold outline of the focused card: a rounded shape slightly larger than the card, behind it, so only a border shows (a cue that does not depend on colour)
+            Image ring = Img(card, "FocusRing", S("ui_pill"), new Color(1f, 0.85f, 0.35f, 0f));
+            Stretch(ring.rectTransform, -9f, -9f, -9f, -9f);
             Image frame = Img(card, "Frame", S("ui_panel_wood"), Color.white, true, true); // the card body: taps on it focus the card
             Stretch(frame.rectTransform);
             Image grain = Img(card, "Grain", S("ui_wood_grain"), new Color(1f, 1f, 1f, 0.55f), false);
@@ -210,30 +231,42 @@ namespace ItemCollector3D.EditorTools
             TextMeshProUGUI nameLabel = nameBanner.Find("Heading").GetComponent<TextMeshProUGUI>();
             nameLabel.name = "AreaName";
 
-            // ---- gold + progress
+            // ---- the same three things on every card (stage 18B): STATUS (UNLOCKED / LOCKED), the TREASURES of the map (x / n, by id) and when it opens, always in TOTAL gold
             float contentWidth = CardWidth - 2f * PreviewInset;
-            RectTransform goldRow = Rect("GoldRow", card);
-            Place(goldRow, new Vector2(0.5f, 1f), new Vector2(0f, -(PreviewTop + PreviewHeight + 14f)), new Vector2(contentWidth, 60f));
-            Image gem = Img(goldRow, "GoldIcon", S("icon_gem"), Color.white, false);
-            Place(gem.rectTransform, new Vector2(0f, 0.5f), new Vector2(4f, 2f), new Vector2(60f, 60f));
-            TextMeshProUGUI goldLabel = Text(goldRow, "AreaGold", "GOAL: 500 GOLD", 50f, "UI_Title_Gold", Gold, TextAlignmentOptions.MidlineLeft);
-            Place(goldLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(80f, 0f), new Vector2(contentWidth - 86f, 60f));
-            goldLabel.enableAutoSizing = true;
-            goldLabel.fontSizeMin = 30f;
-            goldLabel.fontSizeMax = 50f;
+            float below = PreviewTop + PreviewHeight;
+            RectTransform statusRow = Rect("StatusRow", card);
+            Place(statusRow, new Vector2(0.5f, 1f), new Vector2(0f, -(below + 8f)), new Vector2(contentWidth, 56f));
+            Image check = Img(statusRow, "StatusCheck", S("icon_check"), new Color(0.65f, 0.94f, 0.8f, 1f), false);
+            Place(check.rectTransform, new Vector2(0f, 0.5f), new Vector2(8f, 2f), new Vector2(50f, 50f));
+            Image lockIcon2 = Img(statusRow, "StatusLock", S("icon_lock"), new Color(0.78f, 0.82f, 0.95f, 1f), false);
+            Place(lockIcon2.rectTransform, new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(46f, 46f));
+            lockIcon2.gameObject.SetActive(false);
+            TextMeshProUGUI statusLabel = Text(statusRow, "AreaStatus", "UNLOCKED", 50f, "UI_Title_Gold", new Color(0.65f, 0.94f, 0.8f, 1f), TextAlignmentOptions.MidlineLeft);
+            Place(statusLabel.rectTransform, new Vector2(0f, 0.5f), new Vector2(76f, 0f), new Vector2(contentWidth - 82f, 56f));
+            statusLabel.enableAutoSizing = true;
+            statusLabel.fontSizeMin = 30f;
+            statusLabel.fontSizeMax = 50f;
 
             Image track = Img(card, "ProgressTrack", S("ui_slider_track"), Color.white);
-            Place(track.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(PreviewTop + PreviewHeight + 86f)), new Vector2(contentWidth, 40f));
+            Place(track.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(below + 68f)), new Vector2(contentWidth, 36f));
             Image fill = Img(track.transform, "ProgressFill", S("ui_bar_fill"), Color.white, false);
             fill.preserveAspect = false;
-            Stretch(fill.rectTransform, 10f, 8f, 10f, 8f);
+            Stretch(fill.rectTransform, 10f, 7f, 10f, 7f);
             fill.type = Image.Type.Filled;
             fill.fillMethod = Image.FillMethod.Horizontal;
             fill.fillOrigin = (int)Image.OriginHorizontal.Left;
             fill.fillAmount = 0f;
 
-            TextMeshProUGUI caption = BodyText(card, "AreaCaption", "0 / 500 COLLECTED", 34f, Cream, TextAlignmentOptions.Center);
-            Place(caption.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(PreviewTop + PreviewHeight + 134f)), new Vector2(contentWidth, 44f));
+            TextMeshProUGUI treasures = BodyText(card, "AreaTreasures", "TREASURES: 0 / 15", 34f, Cream, TextAlignmentOptions.Center);
+            Place(treasures.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(below + 104f)), new Vector2(contentWidth, 38f));
+            treasures.enableAutoSizing = true;
+            treasures.fontSizeMin = 22f;
+            treasures.fontSizeMax = 34f;
+            TextMeshProUGUI unlock = BodyText(card, "AreaUnlock", "OPEN FROM THE START", 30f, GoldLight, TextAlignmentOptions.Center, "UI_Body_Gold");
+            Place(unlock.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -(below + 142f)), new Vector2(contentWidth, 38f));
+            unlock.enableAutoSizing = true;
+            unlock.fontSizeMin = 20f;
+            unlock.fontSizeMax = 30f;
 
             // ---- one action button, three looks: PLAY (gold) / COMING SOON (wood) / LOCKED (navy)
             var buttonSize = new Vector2(contentWidth, ButtonHeight);
@@ -255,8 +288,12 @@ namespace ItemCollector3D.EditorTools
             so.FindProperty("areaId").stringValue = spec.Id;
             so.FindProperty("sceneName").stringValue = spec.SceneName;
             so.FindProperty("nameLabel").objectReferenceValue = nameLabel;
-            so.FindProperty("goldLabel").objectReferenceValue = goldLabel;
-            so.FindProperty("captionLabel").objectReferenceValue = caption;
+            so.FindProperty("statusLabel").objectReferenceValue = statusLabel;
+            so.FindProperty("treasuresLabel").objectReferenceValue = treasures;
+            so.FindProperty("unlockLabel").objectReferenceValue = unlock;
+            so.FindProperty("statusCheck").objectReferenceValue = check.gameObject;
+            so.FindProperty("statusLockIcon").objectReferenceValue = lockIcon2.gameObject;
+            so.FindProperty("focusRing").objectReferenceValue = ring;
             so.FindProperty("progressFill").objectReferenceValue = fill;
             so.FindProperty("previewImage").objectReferenceValue = preview;
             SerializedProperty fade = so.FindProperty("fadeImages");

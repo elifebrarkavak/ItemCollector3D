@@ -33,6 +33,7 @@ namespace ItemCollector3D.Tests.PlayMode
         private Touchscreen touchscreen;
         private enum Pointer { Mouse, Touch, TouchWhileJoystickHeld }
         private InputSettings.EditorInputBehaviorInPlayMode previousBehaviour;
+        private InputSettings.BackgroundBehavior previousBackground;
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -43,6 +44,8 @@ namespace ItemCollector3D.Tests.PlayMode
             SafeAreaFitter.SafeAreaOverride = () => new Rect(0f, 0f, Screen.width, Screen.height); // independent of the simulator's device frame
             previousBehaviour = InputSystem.settings.editorInputBehaviorInPlayMode;
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            previousBackground = InputSystem.settings.backgroundBehavior;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus; // stage 18C: the UI input module drops pointer events while the Editor is unfocused (test run only, restored below)
             mouse = InputSystem.AddDevice<Mouse>("IC3D_TestMouse");
             touchscreen = InputSystem.AddDevice<Touchscreen>("IC3D_TestTouchscreen");
             yield return null;
@@ -64,6 +67,7 @@ namespace ItemCollector3D.Tests.PlayMode
             }
 
             InputSystem.settings.editorInputBehaviorInPlayMode = previousBehaviour;
+            InputSystem.settings.backgroundBehavior = previousBackground;
             SafeAreaFitter.SafeAreaOverride = null;
             Time.timeScale = previousTimeScale <= 0f ? 1f : previousTimeScale;
             GamePause.Resume();

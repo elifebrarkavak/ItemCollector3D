@@ -25,6 +25,12 @@ namespace ItemCollector3D.Menus
         [SerializeField] private TMP_Text selectLabel;
         [Tooltip("The check mark on the select button: shown only on the miner that is already selected.")]
         [SerializeField] private GameObject selectedMark;
+        [Header("SELECT / SELECTED look (stage 18B): SELECT is the gold action, SELECTED is the green, ticked state")]
+        [SerializeField] private Image selectFace;
+        [SerializeField] private Sprite selectSprite;
+        [SerializeField] private Sprite selectedSprite;
+        [SerializeField] private Material selectLabelMaterial;
+        [SerializeField] private Material selectedLabelMaterial;
         [SerializeField] private Image[] dots = Array.Empty<Image>();
         [SerializeField] private Color dotActive = new Color(0.949f, 0.722f, 0.247f, 1f);
         [SerializeField] private Color dotInactive = new Color(0.44f, 0.27f, 0.19f, 1f);
@@ -35,6 +41,17 @@ namespace ItemCollector3D.Menus
         public int ViewingIndex => viewing;
         public string ViewingId => catalog != null && catalog.Count > 0 ? catalog[viewing].id : null;
         public bool IsOpen => gameObject.activeSelf;
+
+        /// <summary>True when the screen was last closed with SELECT (the miner was saved), false for BACK. The owner reads it in its <see cref="Closed"/> handler.</summary>
+        public bool ClosedByConfirm { get; private set; }
+
+        /// <summary>True while the miner on show is the saved one (the button says SELECTED, is green and ticked).</summary>
+        public bool ViewingIsSelected { get; private set; }
+
+        public string SelectLabelText => selectLabel != null ? selectLabel.text : string.Empty;
+        public bool SelectedMarkVisible => selectedMark != null && selectedMark.activeSelf;
+        public Button SelectButton => selectButton;
+        public bool SelectedLookShown => selectFace != null && selectedSprite != null && selectFace.sprite == selectedSprite;
 
         /// <summary>Raised when the screen closes (SELECT or BACK); the owner decides what to show next.</summary>
         public event Action Closed;
@@ -107,6 +124,7 @@ namespace ItemCollector3D.Menus
                 CharacterSelection.Select(catalog[viewing].id);
             }
 
+            ClosedByConfirm = true;
             CloseScreen();
         }
 
@@ -118,6 +136,7 @@ namespace ItemCollector3D.Menus
                 stage.ShowSelected();
             }
 
+            ClosedByConfirm = false;
             CloseScreen();
         }
 
@@ -143,8 +162,11 @@ namespace ItemCollector3D.Menus
             bool equipped = entry.id == CharacterSelection.ResolveId(catalog);
             if (nameLabel != null) { nameLabel.text = entry.displayName; }
             if (taglineLabel != null) { taglineLabel.text = entry.tagline; }
+            ViewingIsSelected = equipped;
             if (selectLabel != null) { selectLabel.text = equipped ? "SELECTED" : "SELECT"; }
             if (selectedMark != null) { selectedMark.SetActive(equipped); }
+            if (selectFace != null && selectSprite != null && selectedSprite != null) { selectFace.sprite = equipped ? selectedSprite : selectSprite; }
+            if (selectLabel != null && selectLabelMaterial != null && selectedLabelMaterial != null) { selectLabel.fontSharedMaterial = equipped ? selectedLabelMaterial : selectLabelMaterial; }
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] != null)

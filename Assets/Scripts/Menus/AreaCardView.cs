@@ -8,7 +8,7 @@ namespace ItemCollector3D.Menus
 {
     /// <summary>
     /// One big card of the Area Selection: preview picture, name, lock / coming-soon / complete markers, gold progress and one action button.
-    /// It only SHOWS an <see cref="AreaCardState"/> (the controller decides what a tap does) and animates a little: the focused card lifts and glows,
+    /// It only SHOWS an <see cref="AreaCardState"/> (the controller decides what a tap does) and animates a little: the focused card is outlined and glows (all cards keep one size and one row),
     /// the progress bar fills, a tap on a closed card shakes it. Unscaled time, so it also works while the game is paused.
     /// The three action buttons (PLAY / COMING SOON / LOCKED) share one spot; exactly one is shown.
     /// </summary>
@@ -23,8 +23,17 @@ namespace ItemCollector3D.Menus
 
         [Header("Content")]
         [SerializeField] private TMP_Text nameLabel;
-        [SerializeField] private TMP_Text goldLabel;
-        [SerializeField] private TMP_Text captionLabel;
+        [Tooltip("The big line: UNLOCKED or LOCKED.")]
+        [SerializeField] private TMP_Text statusLabel;
+        [Tooltip("Under the bar: TREASURES: x / n.")]
+        [SerializeField] private TMP_Text treasuresLabel;
+        [Tooltip("When the map opens, in TOTAL gold: UNLOCKS AT 500 TOTAL GOLD.")]
+        [SerializeField] private TMP_Text unlockLabel;
+        [Tooltip("The check mark (open) and the padlock (closed) in front of the status line: a shape, not only a colour.")]
+        [SerializeField] private Color unlockedStatusColor = new Color(0.65f, 0.94f, 0.8f, 1f);
+        [SerializeField] private Color lockedStatusColor = new Color(0.78f, 0.82f, 0.95f, 1f);
+        [SerializeField] private GameObject statusCheck;
+        [SerializeField] private GameObject statusLockIcon;
         [SerializeField] private Image progressFill;
         [SerializeField] private Image previewImage;
         [Tooltip("Pictures that fade (and get a cool tint) while the area is locked: the frame, the preview, the name banner.")]
@@ -46,8 +55,11 @@ namespace ItemCollector3D.Menus
 
         [Header("Feedback")]
         [SerializeField] private Image focusGlow;
-        [SerializeField] private float focusedScale = 1.025f;
-        [SerializeField] private float idleScale = 0.985f;
+        [Tooltip("The gold outline of the focused card: a shape that tells the focused card apart without relying on colour.")]
+        [SerializeField] private Image focusRing;
+        [Tooltip("All three cards keep ONE size and ONE row; the focused one is only outlined and glows.")]
+        [SerializeField] private float focusedScale = 1f;
+        [SerializeField] private float idleScale = 1f;
 
         private RectTransform rect;
         private AreaCardState state;
@@ -74,8 +86,12 @@ namespace ItemCollector3D.Menus
         public Button PlayButton => playButton;
         public Button ComingSoonButton => comingSoonButton;
         public Button LockedButton => lockedButton;
-        public TMP_Text GoldLabel => goldLabel;
-        public TMP_Text CaptionLabel => captionLabel;
+        public TMP_Text StatusLabel => statusLabel;
+        public TMP_Text TreasuresLabel => treasuresLabel;
+        public TMP_Text UnlockLabel => unlockLabel;
+        public bool StatusCheckVisible => statusCheck != null && statusCheck.activeSelf;
+        public bool StatusLockVisible => statusLockIcon != null && statusLockIcon.activeSelf;
+        public bool RingVisible => focusRing != null && focusRing.color.a > 0.5f;
         public bool LockVisible => lockOverlay != null && lockOverlay.activeSelf;
         public bool ComingSoonVisible => comingSoonRibbon != null && comingSoonRibbon.activeSelf;
         public bool CompleteVisible => completeChip != null && completeChip.activeSelf;
@@ -155,8 +171,11 @@ namespace ItemCollector3D.Menus
             bool playable = newState.Availability == AreaAvailability.Playable;
 
             if (nameLabel != null) { nameLabel.text = newState.DisplayName; }
-            if (goldLabel != null) { goldLabel.text = newState.GoldText; }
-            if (captionLabel != null) { captionLabel.text = newState.CaptionText; }
+            if (statusLabel != null) { statusLabel.text = newState.StatusLine; statusLabel.color = locked ? lockedStatusColor : unlockedStatusColor; }
+            if (treasuresLabel != null) { treasuresLabel.text = newState.TreasureText; }
+            if (unlockLabel != null) { unlockLabel.text = newState.UnlockText; }
+            SetActive(statusCheck, !locked);
+            SetActive(statusLockIcon, locked);
 
             SetActive(lockOverlay, locked);
             SetActive(comingSoonRibbon, soon);
@@ -257,6 +276,13 @@ namespace ItemCollector3D.Menus
                 Color c = focusGlow.color;
                 c.a = glow;
                 focusGlow.color = c;
+            }
+
+            if (focusRing != null)
+            {
+                Color c = focusRing.color;
+                c.a = Mathf.Clamp01(glow * 1.2f);
+                focusRing.color = c;
             }
 
             if (progressFill != null)

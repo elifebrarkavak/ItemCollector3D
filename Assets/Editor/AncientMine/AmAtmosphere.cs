@@ -218,26 +218,16 @@ namespace ItemCollector3D.EditorTools.AncientMine
             var rect = (RectTransform)copy.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -214f);
-            rect.sizeDelta = new Vector2(820f, 88f); // "FORGOTTEN WORKSHOP" is the longest name
+            rect.anchoredPosition = new Vector2(0f, Hud18cBuilder.ZoneBannerTop); // below the detector's hint plate (stage 18C)
+            rect.sizeDelta = new Vector2(820f, Hud18cBuilder.ZoneBannerSize.y); // "FORGOTTEN WORKSHOP" is the longest name
 
             var banner = copy.GetComponent<NotificationBanner>();
             var bannerSo = new SerializedObject(banner);
             bannerSo.FindProperty("holdDuration").floatValue = 1.75f;
             bannerSo.ApplyModifiedPropertiesWithoutUndo();
 
-            var title = (RectTransform)copy.transform.Find("Title");
-            title.anchorMin = Vector2.zero;
-            title.anchorMax = Vector2.one;
-            title.pivot = new Vector2(0.5f, 0.5f);
-            title.offsetMin = new Vector2(16f, 6f);
-            title.offsetMax = new Vector2(-16f, -6f);
-            var titleText = title.GetComponent<TMPro.TMP_Text>();
-            titleText.fontSize = 46f;
-            titleText.alignment = TMPro.TextAlignmentOptions.Center;
-            titleText.characterSpacing = 6f;
-            titleText.text = "ANCIENT GATE";
-            copy.transform.Find("Subtitle").gameObject.SetActive(false);
+            Hud18cBuilder.StyleBanner(rect, true); // the navy + gold panel, the UI font, one centred line, the subtitle off (stage 18C)
+            copy.transform.Find("Title").GetComponent<TMPro.TMP_Text>().text = "ANCIENT GATE";
 
             var notice = holder.AddComponent<ZoneEntryNotice>();
             var so = new SerializedObject(notice);

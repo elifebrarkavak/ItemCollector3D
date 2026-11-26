@@ -433,7 +433,7 @@ namespace ItemCollector3D.UI
 
                 string name = (areas[i].displayName ?? areas[i].id).ToUpperInvariant();
                 int total = TreasureCatalog.IdsOf(areas[i].id).Count;
-                SetText(skin.areaRows[i], $"{name}   {s.CollectedTreasureCountIn(areas[i].id)} / {total}");
+                SetText(skin.areaRows[i], $"{name}<pos=50%>{s.CollectedTreasureCountIn(areas[i].id)} / {total}"); // the counts line up in a column (stage 18D)
             }
         }
 

@@ -10,7 +10,7 @@ namespace ItemCollector3D.EditorTools
     /// <summary>Construction helpers for the UI design system: every screen is assembled from these pieces so all of it looks alike.</summary>
     public static class UiKit
     {
-        public enum ButtonStyle { Gold, Wood, Green, Navy }
+        public enum ButtonStyle { Gold, Wood, Green, Navy, Red }
 
         public static Sprite S(string name) => UiSpriteFactory.Load(name);
 
@@ -142,6 +142,7 @@ namespace ItemCollector3D.EditorTools
             ButtonStyle.Gold => "ui_btn_gold",
             ButtonStyle.Wood => "ui_btn_wood",
             ButtonStyle.Green => "ui_btn_green",
+            ButtonStyle.Red => "ui_btn_red",
             _ => "ui_btn_navy",
         };
 
@@ -150,6 +151,7 @@ namespace ItemCollector3D.EditorTools
             ButtonStyle.Gold => "UI_Text_GoldDeep",
             ButtonStyle.Wood => "UI_Text_Brown",
             ButtonStyle.Green => "UI_Text_Green",
+            ButtonStyle.Red => "UI_Text_Red",
             _ => "UI_Text_Navy",
         };
 

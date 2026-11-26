@@ -1,5 +1,6 @@
 using System;
 using ItemCollector3D.Progress;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -19,6 +20,8 @@ namespace ItemCollector3D.Menus
         [SerializeField] private ProgressManager progress;
         [SerializeField] private AreaCardView[] cards = Array.Empty<AreaCardView>();
         [SerializeField] private Button backButton;
+        [Tooltip("TOTAL GOLD: 655, once for the whole screen (never a per map number).")]
+        [SerializeField] private TMP_Text totalGoldLabel;
         [SerializeField] private MenuCharacterStage stage;
 
         private ProgressService fallbackService;
@@ -30,6 +33,10 @@ namespace ItemCollector3D.Menus
         public int FocusedIndex => focusedIndex;
         public bool IsOpen => gameObject.activeSelf;
         public Button BackButton => backButton;
+        public TMP_Text TotalGoldLabel => totalGoldLabel;
+
+        /// <summary>The label of the player's total gold (the gold of the whole game, not of one map).</summary>
+        public static string TotalGoldText(int totalGold) => "TOTAL GOLD: " + Mathf.Max(0, totalGold);
 
         /// <summary>Raised when BACK is pressed (the owner decides what to show next).</summary>
         public event Action Closed;
@@ -129,6 +136,11 @@ namespace ItemCollector3D.Menus
         {
             EnsureListeners();
             ProgressService service = Service;
+            if (totalGoldLabel != null)
+            {
+                totalGoldLabel.text = TotalGoldText(service.TotalGold); // the whole game's gold, said so, shown once for all three maps
+            }
+
             for (int i = 0; i < cards.Length; i++)
             {
                 AreaCardView card = cards[i];
@@ -168,7 +180,11 @@ namespace ItemCollector3D.Menus
             AreaAvailability availability = !service.IsAreaUnlocked(areaId)
                 ? AreaAvailability.Locked
                 : string.IsNullOrEmpty(sceneName) ? AreaAvailability.ComingSoon : AreaAvailability.Playable;
-            return new AreaCardState(areaId, entry.displayName, availability, service.TotalGold, entry.unlockTotalGold, entry.goalTotalGold, service.IsAreaCompleted(areaId));
+
+            // the treasures of the map by id (15 / 20 / 25), never the gold: "complete" on a card means every treasure is found
+            int total = TreasureCatalog.IdsOf(areaId).Count;
+            int found = service.CollectedTreasureCountIn(areaId);
+            return new AreaCardState(areaId, entry.displayName, availability, service.TotalGold, entry.unlockTotalGold, entry.goalTotalGold, total > 0 && found >= total, found, total);
         }
 
         private static AreaCardState Evaluate(ProgressService service, AreaCardView card)

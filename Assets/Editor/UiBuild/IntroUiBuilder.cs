@@ -55,7 +55,7 @@ namespace ItemCollector3D.EditorTools
             var controller = panel.gameObject.AddComponent<IntroSlidesController>();
 
             // a solid backdrop far larger than any screen (display cut-outs, the bars above and below the safe area, tall phones): the Main Menu never shows through, and it catches every touch
-            Image backdrop = Img(panel, "Backdrop", null, new Color(0.03f, 0.05f, 0.09f, 1f), false, true);
+            Image backdrop = Img(panel, "Backdrop", null, new Color(CaveNavy.r * 0.7f, CaveNavy.g * 0.7f, CaveNavy.b * 0.7f, 1f), false, true); // the cave navy of the other menus, a little darker (it used to be almost black)
             Stretch(backdrop.rectTransform, -4000f, -4000f, -4000f, -4000f);
             Image vignette = Img(panel, "Vignette", S("ui_vignette"), new Color(1f, 1f, 1f, 0.9f), false);
             vignette.preserveAspect = false;
@@ -103,12 +103,12 @@ namespace ItemCollector3D.EditorTools
                 title.fontSizeMin = 56f;
                 title.fontSizeMax = 92f;
                 title.lineSpacing = -12f;
-                Center(title.rectTransform, new Vector2(520f, 235f), new Vector2(740f, 250f));
+                Center(title.rectTransform, new Vector2(520f, 195f), new Vector2(740f, 250f)); // a little lower than before: SKIP sits in the top right corner now and must stay clear of the title
 
                 TextMeshProUGUI body = BodyText(page, "Body", Bodies[i], 42f, Cream, TextAlignmentOptions.TopLeft);
                 body.textWrappingMode = TextWrappingModes.Normal;
                 body.lineSpacing = 6f;
-                Center(body.rectTransform, new Vector2(520f, -85f), new Vector2(740f, 370f));
+                Center(body.rectTransform, new Vector2(520f, -120f), new Vector2(740f, 340f));
             }
 
             // ---- page dots, under the picture
@@ -119,16 +119,16 @@ namespace ItemCollector3D.EditorTools
                 Center(dots[i].rectTransform, new Vector2(pictureCentre.x + (i - 1) * 56f, -300f), new Vector2(30f, 30f));
             }
 
-            // ---- navigation: BACK left, SKIP middle, NEXT / LET'S PLAY right
+            // ---- navigation (stage 18B): every button keeps ONE place on every page. BACK is always bottom left, NEXT and LET'S PLAY are the same size at the same bottom right spot, SKIP sits in the top right corner.
             const float navY = -405f, navHeight = 140f;
             Button back = TextButton(panel, "IntroBackButton", "BACK", ButtonStyle.Navy, new Vector2(340f, navHeight), 62f, "icon_chev_l");
             Center(back.GetComponent<RectTransform>(), new Vector2(-600f, navY), new Vector2(340f, navHeight));
-            Button skip = TextButton(panel, "IntroSkipButton", "SKIP", ButtonStyle.Wood, new Vector2(340f, navHeight), 62f);
-            Center(skip.GetComponent<RectTransform>(), new Vector2(0f, navY), new Vector2(340f, navHeight));
-            Button next = TextButton(panel, "IntroNextButton", "NEXT", ButtonStyle.Gold, new Vector2(380f, navHeight), 70f, "icon_chev_r");
-            Center(next.GetComponent<RectTransform>(), new Vector2(590f, navY), new Vector2(380f, navHeight));
-            Button play = TextButton(panel, "IntroPlayButton", "LET'S PLAY", ButtonStyle.Gold, new Vector2(560f, navHeight), 70f, "icon_play", true);
-            Center(play.GetComponent<RectTransform>(), new Vector2(500f, navY), new Vector2(560f, navHeight));
+            Button skip = TextButton(panel, "IntroSkipButton", "SKIP", ButtonStyle.Wood, new Vector2(300f, 112f), 54f);
+            Place(skip.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(-40f, -32f), new Vector2(300f, 112f));
+            Button next = TextButton(panel, "IntroNextButton", "NEXT", ButtonStyle.Gold, new Vector2(520f, navHeight), 70f, "icon_chev_r");
+            Center(next.GetComponent<RectTransform>(), new Vector2(520f, navY), new Vector2(520f, navHeight));
+            Button play = TextButton(panel, "IntroPlayButton", "LET'S PLAY", ButtonStyle.Gold, new Vector2(520f, navHeight), 70f, "icon_play", true);
+            Center(play.GetComponent<RectTransform>(), new Vector2(520f, navY), new Vector2(520f, navHeight));
 
             var so = new SerializedObject(controller);
             SerializedProperty pageArray = so.FindProperty("pages");
@@ -196,12 +196,12 @@ namespace ItemCollector3D.EditorTools
         /// <summary>Page 3: the three areas in order, each with what it takes to get in.</summary>
         private static void AreaCards(RectTransform picture, Vector2 size)
         {
-            Image inset = Img(picture, "Backdrop", S("ui_row_inset"), new Color(NavyDeep.r, NavyDeep.g, NavyDeep.b, 0.96f));
+            Image inset = Img(picture, "Backdrop", S("ui_pill"), Hex("#253650")); // a navy panel, not a black hole
             Stretch(inset.rectTransform);
             string[] sprites = { "area_green_mine", "area_rocky_canyon", "area_ancient_mine" };
             string[] names = { "GREEN MINE", "ROCKY CANYON", "ANCIENT MINE" };
             string[] needs = { "START HERE", "500 GOLD", "1200 GOLD" };
-            const float cardWidth = 250f, cardHeight = 171f, gap = 50f;
+            const float cardWidth = 262f, cardHeight = 179f, gap = 36f;
             for (int i = 0; i < 3; i++)
             {
                 float x = (i - 1) * (cardWidth + gap);
@@ -210,13 +210,16 @@ namespace ItemCollector3D.EditorTools
                 Shadow(card, new Vector2(cardWidth, cardHeight), new Vector2(0f, -8f), 0.4f, 18f);
                 Image art = Img(card, "Art", Area(sprites[i]), Color.white, false);
                 Stretch(art.rectTransform);
-                TextMeshProUGUI label = Text(card, "Name", names[i], 40f, "UI_Title_Gold", GoldLight);
-                Center(label.rectTransform, new Vector2(0f, -cardHeight * 0.5f - 44f), new Vector2(cardWidth + 40f, 56f));
-                Chip(card, needs[i], i == 0 ? GreenLight : GoldLight, new Vector2(0f, -cardHeight * 0.5f - 112f), new Vector2(cardWidth - 20f, 56f), 34f);
+                TextMeshProUGUI label = Text(card, "Name", names[i], 46f, "UI_Title_Gold", GoldLight);
+                Center(label.rectTransform, new Vector2(0f, -cardHeight * 0.5f - 46f), new Vector2(cardWidth + 30f, 62f));
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 30f;
+                label.fontSizeMax = 46f;
+                Chip(card, needs[i], i == 0 ? GreenLight : GoldLight, new Vector2(0f, -cardHeight * 0.5f - 122f), new Vector2(cardWidth - 8f, 64f), 40f);
                 if (i < 2)
                 {
                     Image arrow = Img(card, "Arrow", S("icon_chev_r"), Color.white, false);
-                    Center(arrow.rectTransform, new Vector2(cardWidth * 0.5f + gap * 0.5f, 0f), new Vector2(54f, 54f));
+                    Center(arrow.rectTransform, new Vector2(cardWidth * 0.5f + gap * 0.5f, 0f), new Vector2(60f, 60f));
                 }
             }
         }

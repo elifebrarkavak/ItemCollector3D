@@ -21,10 +21,15 @@ namespace ItemCollector3D.UI
         [SerializeField] private float bottomMargin = 20f;
         [SerializeField] private float sideMargin = 24f;
         [SerializeField, Range(0.3f, 1f)] private float minScale = 0.5f;
+        [Tooltip("When the container is taller than the block needs (4:3), move the block down by half of the spare height so it does not hug the top (stage 18B).")]
+        [SerializeField] private bool centreVertically;
+        [SerializeField] private float centreMaxShift = 260f;
 
         private RectTransform container;
         private Vector2 lastSize = new Vector2(-1f, -1f);
         private float scale = 1f;
+        private float baseY;
+        private bool baseCaptured;
 
         /// <summary>1 when the block fits at its authored size, less when the safe area is tighter.</summary>
         public float CurrentScale => scale;
@@ -71,6 +76,18 @@ namespace ItemCollector3D.UI
             float availableHeight = size.y - topInset - bottomMargin;
             scale = Mathf.Clamp(Mathf.Min(availableWidth / designSize.x, availableHeight / designSize.y), minScale, 1f);
             target.localScale = new Vector3(scale, scale, 1f);
+
+            if (centreVertically)
+            {
+                if (!baseCaptured)
+                {
+                    baseCaptured = true;
+                    baseY = target.anchoredPosition.y;
+                }
+
+                float spare = Mathf.Max(0f, availableHeight - designSize.y * scale);
+                target.anchoredPosition = new Vector2(target.anchoredPosition.x, baseY - Mathf.Min(spare * 0.5f, centreMaxShift));
+            }
         }
     }
 }

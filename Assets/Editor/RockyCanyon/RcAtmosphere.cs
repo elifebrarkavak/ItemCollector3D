@@ -459,8 +459,8 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             var rect = (RectTransform)copy.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -214f);
-            rect.sizeDelta = new Vector2(720f, 88f);
+            rect.anchoredPosition = new Vector2(0f, Hud18cBuilder.ZoneBannerTop); // below the detector's hint plate (stage 18C)
+            rect.sizeDelta = new Vector2(720f, Hud18cBuilder.ZoneBannerSize.y);
 
             var banner = copy.GetComponent<NotificationBanner>();
             var bannerSo = new SerializedObject(banner);
@@ -468,18 +468,8 @@ namespace ItemCollector3D.EditorTools.RockyCanyon
             bannerSo.ApplyModifiedPropertiesWithoutUndo();
 
             // one line, centred in the box; the subtitle is not used
-            var title = (RectTransform)copy.transform.Find("Title");
-            title.anchorMin = Vector2.zero;
-            title.anchorMax = Vector2.one;
-            title.pivot = new Vector2(0.5f, 0.5f);
-            title.offsetMin = new Vector2(16f, 6f);
-            title.offsetMax = new Vector2(-16f, -6f);
-            var titleText = title.GetComponent<TMPro.TMP_Text>();
-            titleText.fontSize = 50f;
-            titleText.alignment = TMPro.TextAlignmentOptions.Center;
-            titleText.characterSpacing = 6f;
-            titleText.text = "DESERT OUTPOST";
-            copy.transform.Find("Subtitle").gameObject.SetActive(false);
+            Hud18cBuilder.StyleBanner(rect, true); // the navy + gold panel, the UI font, one centred line, the subtitle off (stage 18C)
+            copy.transform.Find("Title").GetComponent<TMPro.TMP_Text>().text = "DESERT OUTPOST";
 
             var notice = holder.AddComponent<ZoneEntryNotice>();
             Link(notice, ("zones", tracker), ("banner", (Object)banner), ("progressBanner", (Object)progressBanner), ("hunt", hunt));
